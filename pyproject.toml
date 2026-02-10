@@ -1,0 +1,56 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "chorus-ai"
+version = "0.1.0"
+description = "Chorus AI V1 — deterministic dossier pipeline"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Proprietary" }
+authors = [{ name = "Chorus AI" }]
+dependencies = [
+  "pydantic>=2.7",
+  "jsonschema>=4.22",
+  "rich>=13.7",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0",
+  "pytest-xdist>=3.5",
+  "ruff>=0.6",
+  "mypy>=1.10",
+  "types-jsonschema",
+]
+
+[project.scripts]
+chorus-ai = "chorus_ai.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["chorus_ai*"]
+
+[tool.pytest.ini_options]
+testpaths = ["src/chorus_ai/tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+no_implicit_optional = true
+strict_equality = true

@@ -1,0 +1,10 @@
+README.md
+pyproject.toml
+src/chorus_ai/__init__.py
+src/chorus_ai/cli.py
+src/chorus_ai.egg-info/PKG-INFO
+src/chorus_ai.egg-info/SOURCES.txt
+src/chorus_ai.egg-info/dependency_links.txt
+src/chorus_ai.egg-info/entry_points.txt
+src/chorus_ai.egg-info/requires.txt
+src/chorus_ai.egg-info/top_level.txt

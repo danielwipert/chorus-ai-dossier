@@ -1,0 +1,2 @@
+[console_scripts]
+chorus-ai = chorus_ai.cli:main

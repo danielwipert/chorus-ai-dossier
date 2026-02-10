@@ -1,0 +1,21 @@
+Metadata-Version: 2.4
+Name: chorus-ai
+Version: 0.1.0
+Summary: Chorus AI V1 — deterministic dossier pipeline
+Author: Chorus AI
+License: Proprietary
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+Requires-Dist: pydantic>=2.7
+Requires-Dist: jsonschema>=4.22
+Requires-Dist: rich>=13.7
+Provides-Extra: dev
+Requires-Dist: pytest>=8.0; extra == "dev"
+Requires-Dist: pytest-xdist>=3.5; extra == "dev"
+Requires-Dist: ruff>=0.6; extra == "dev"
+Requires-Dist: mypy>=1.10; extra == "dev"
+Requires-Dist: types-jsonschema; extra == "dev"
+
+# Chorus AI (V1)
+
+Deterministic dossier pipeline (skeleton).
