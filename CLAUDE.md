@@ -348,18 +348,20 @@ chorus-ai/
 
 ## What's Already Built (Update This As Work Progresses)
 
-- [ ] Stage 1: Ingestion
-- [ ] Stage 2: Fact Extraction
-- [ ] Stage 3: Summarization
-- [ ] Stage 4: Verification + retry loop
-- [ ] Stage 5: Contextual Analysis
-- [ ] Stage 6: Compilation
-- [ ] Stage 7: Finalization + PDF export
-- [ ] Orchestrator / state machine
-- [ ] Run folder manager
-- [ ] Audit trail
-- [ ] Config system
-- [ ] CLI entry point
+- [x] Stage 1: Ingestion — pdfplumber extraction, text density validation, page/paragraph segmentation
+- [x] Stage 2: Fact Extraction — LLM (haiku) with type classification, source locations, confidence scores
+- [x] Stage 3: Summarization — three independent LLM summaries (A, B, C) with deterministic IDs
+- [x] Stage 4: Verification + retry loop — structural + LLM semantic scoring (0.75 threshold), regenerates failed summaries
+- [x] Stage 5: Contextual Analysis — two contextualizer models, non-fatal, notes gaps
+- [x] Stage 6: Compilation — LLM synthesis with convergence scoring and section lineage
+- [x] Stage 7: Finalization — all six required dossier sections + audit trail (PDF export deferred to V2)
+- [x] Orchestrator / state machine — CONTEXTUALIZED state added between VERIFIED and COMPILED
+- [x] Run folder manager — 00_input/, 50_contextual/, 60_compilation/, 70_export/
+- [x] Audit trail — embedded in final dossier (source hash, fact count, verification scores, model participation)
+- [x] Config system — configs/v1.json with model assignments, thresholds, retry limits
+- [x] CLI entry point — all 7 stages wired, resume semantics, non-fatal contextualize handling
+- [x] LLM client — unified Anthropic wrapper, temperature=0, graceful non-Anthropic fallback
+- [x] Prompt files — one .txt per stage in stages/prompts/, not hardcoded in Python
 
 ---
 
