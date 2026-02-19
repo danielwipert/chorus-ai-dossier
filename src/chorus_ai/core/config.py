@@ -29,3 +29,8 @@ def canonicalize_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
 
 def load_and_canonicalize_config(path: Path) -> Dict[str, Any]:
     return canonicalize_config(load_config(path))
+
+
+def load_run_config(run_root: Path) -> Dict[str, Any]:
+    """Load the canonicalized config stored inside a run folder."""
+    return load_and_canonicalize_config(run_root / "00_meta" / "config.canonical.json")

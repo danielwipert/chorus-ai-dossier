@@ -1,4 +1,22 @@
 {
   "pipeline_version": "v1",
-  "notes": "Step A skeleton"
+  "models": {
+    "summarizer_a": "claude-haiku-4-5-20251001",
+    "summarizer_b": "claude-haiku-4-5-20251001",
+    "summarizer_c": "claude-haiku-4-5-20251001",
+    "fact_finder": "claude-haiku-4-5-20251001",
+    "compiler": "claude-sonnet-4-6",
+    "contextualizer_a": "claude-sonnet-4-6",
+    "contextualizer_b": "claude-sonnet-4-6"
+  },
+  "verification": {
+    "pass_threshold": 0.75,
+    "max_retries": 2
+  },
+  "ingestion": {
+    "min_chars_per_page": 50
+  },
+  "output": {
+    "include_audit_trail": true
+  }
 }

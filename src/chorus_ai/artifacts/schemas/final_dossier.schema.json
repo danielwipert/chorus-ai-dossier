@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["schema_version", "source_doc_sha256", "dossier_id", "sections", "export_paths"],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "source_doc_sha256": { "type": "string" },
+    "dossier_id": { "type": "string" },
+    "sections": {
+      "type": "object",
+      "required": [
+        "executive_overview",
+        "key_claims",
+        "compiled_summary",
+        "contextual_analysis",
+        "risks_and_limitations",
+        "audit_trail"
+      ]
+    },
+    "export_paths": { "type": "array" },
+    "warnings": { "type": "array" },
+    "created_at": { "type": "string" },
+    "run_status": { "type": "string" }
+  },
+  "additionalProperties": true
+}

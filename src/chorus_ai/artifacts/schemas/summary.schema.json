@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["schema_version", "source_doc_sha256", "summary_id", "summary_text"],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "source_doc_sha256": { "type": "string" },
+    "summary_id": { "type": "string" },
+    "model_slot": { "type": "string" },
+    "model_id": { "type": "string" },
+    "summary_text": { "type": "string" },
+    "fact_count": { "type": "integer" },
+    "created_at": { "type": "string" },
+    "inputs": { "type": "object" }
+  },
+  "additionalProperties": true
+}

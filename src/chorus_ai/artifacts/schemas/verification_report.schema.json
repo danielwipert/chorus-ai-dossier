@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["schema_version", "source_doc_sha256", "verification_id", "checks"],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "source_doc_sha256": { "type": "string" },
+    "verification_id": { "type": "string" },
+    "checks": { "type": "array" }
+  },
+  "additionalProperties": true
+}

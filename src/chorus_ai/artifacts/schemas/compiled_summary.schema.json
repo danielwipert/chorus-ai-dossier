@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["schema_version", "source_doc_sha256", "compiled_id", "compiled_summary_text"],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "source_doc_sha256": { "type": "string" },
+    "compiled_id": { "type": "string" },
+    "executive_overview": { "type": "string" },
+    "compiled_summary_text": { "type": "string" },
+    "key_claims": { "type": "array" },
+    "risks_and_limitations": { "type": "string" },
+    "section_lineage": { "type": "object" },
+    "model_slot": { "type": "string" },
+    "model_id": { "type": "string" },
+    "created_at": { "type": "string" },
+    "warnings": { "type": "array" }
+  },
+  "additionalProperties": true
+}
