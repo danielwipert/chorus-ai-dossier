@@ -11,4 +11,4 @@ RULES:
 6. Maintain proportional coverage: devote more attention to topics the document spends more time on.
 7. Do not omit minority positions or qualifications the author makes.
 
-Return plain prose text. Aim for 300–600 words covering the full document scope. Do not return JSON.
+Return plain prose text. Aim for 600–1000 words covering the full document scope. Do not return JSON.

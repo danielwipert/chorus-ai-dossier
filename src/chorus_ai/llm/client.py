@@ -1,7 +1,10 @@
 """Unified LLM API wrapper for Chorus AI.
 
-Supports Anthropic (claude-* models) natively.
-Non-Anthropic model names fall back to the Anthropic haiku model with a warning.
+Supported providers (routing is automatic from the model name):
+  - Anthropic: any model starting with "claude-"
+  - HuggingFace Inference API: any model containing "/" (e.g. "meta-llama/Llama-3.1-8B-Instruct")
+  - Unknown models: fall back to Anthropic haiku with a warning (same as before)
+
 All calls use temperature=0 for determinism (per CLAUDE.md Core Design Rules).
 """
 from __future__ import annotations
@@ -14,10 +17,16 @@ from pathlib import Path
 from typing import Any
 
 _FALLBACK_MODEL = "claude-haiku-4-5-20251001"
+_HF_BASE_URL = "https://router.huggingface.co/v1/"
 
 
 def _is_anthropic(model: str) -> bool:
     return model.startswith("claude-")
+
+
+def _is_huggingface(model: str) -> bool:
+    """HuggingFace model names always contain a slash (e.g. 'meta-llama/Llama-3.1-8B-Instruct')."""
+    return "/" in model
 
 
 def parse_json_response(text: str) -> Any:
@@ -75,18 +84,34 @@ class LLMClient:
         max_tokens: int = 4096,
         temperature: float = 0.0,
     ) -> str:
-        """Call the LLM and return response text. Falls back for non-Anthropic models."""
-        if not _is_anthropic(model):
-            warnings.warn(
-                f"Non-Anthropic model '{model}' not yet supported; "
-                f"falling back to '{_FALLBACK_MODEL}'.",
-                UserWarning,
-                stacklevel=2,
+        """Route to the correct provider based on model name and return response text."""
+        if _is_anthropic(model):
+            return self._call_anthropic(
+                model=model,
+                system=system,
+                user=user,
+                max_tokens=max_tokens,
+                temperature=temperature,
             )
-            model = _FALLBACK_MODEL
 
+        if _is_huggingface(model):
+            return self._call_huggingface(
+                model=model,
+                system=system,
+                user=user,
+                max_tokens=max_tokens,
+                temperature=temperature,
+            )
+
+        # Unknown model — fall back to haiku with a warning
+        warnings.warn(
+            f"Unknown model '{model}' is not Anthropic or HuggingFace; "
+            f"falling back to '{_FALLBACK_MODEL}'.",
+            UserWarning,
+            stacklevel=2,
+        )
         return self._call_anthropic(
-            model=model,
+            model=_FALLBACK_MODEL,
             system=system,
             user=user,
             max_tokens=max_tokens,
@@ -122,3 +147,38 @@ class LLMClient:
             messages=[{"role": "user", "content": user}],
         )
         return message.content[0].text  # type: ignore[index]
+
+    def _call_huggingface(
+        self,
+        *,
+        model: str,
+        system: str,
+        user: str,
+        max_tokens: int,
+        temperature: float,
+    ) -> str:
+        try:
+            from openai import OpenAI
+        except ImportError as exc:
+            raise RuntimeError(
+                "openai package not installed. Run: pip install openai"
+            ) from exc
+
+        api_key = os.environ.get("HF_TOKEN")
+        if not api_key:
+            raise RuntimeError("HF_TOKEN environment variable is not set.")
+
+        client = OpenAI(base_url=_HF_BASE_URL, api_key=api_key)
+        response = client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+            max_tokens=max_tokens,
+            temperature=temperature,
+        )
+        content = response.choices[0].message.content
+        if content is None:
+            raise RuntimeError(f"HuggingFace model '{model}' returned an empty response.")
+        return content

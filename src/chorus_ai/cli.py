@@ -3,6 +3,10 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
+from dotenv import load_dotenv
+
+load_dotenv()  # loads .env from cwd or any parent directory
+
 from chorus_ai.core.config import load_and_canonicalize_config
 from chorus_ai.core.errors import ChorusFatalError
 from chorus_ai.core.hashing import sha256_file
