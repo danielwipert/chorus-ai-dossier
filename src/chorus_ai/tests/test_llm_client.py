@@ -115,6 +115,40 @@ class TestHuggingFaceRouting:
         assert len(anthropic_called) == 0
 
 
+class TestTogetherRouting:
+    def test_together_prefix_routes_to_together(self, monkeypatch):
+        called = {}
+
+        def fake_together(self, *, model, system, user, max_tokens, temperature):
+            called["model"] = model
+            return "together response"
+
+        monkeypatch.setattr(LLMClient, "_call_together", fake_together)
+        client = LLMClient({})
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            result = client.complete(model="together:mistralai/Mixtral-8x7B-Instruct-v0.1", system="s", user="u")
+        assert result == "together response"
+        assert called["model"] == "together:mistralai/Mixtral-8x7B-Instruct-v0.1"
+        assert len(w) == 0
+
+    def test_together_does_not_call_huggingface(self, monkeypatch):
+        monkeypatch.setattr(LLMClient, "_call_together", lambda self, **kw: "ok")
+        hf_called = []
+        monkeypatch.setattr(LLMClient, "_call_huggingface", lambda self, **kw: hf_called.append(1) or "x")
+        client = LLMClient({})
+        client.complete(model="together:mistralai/Mixtral-8x7B-Instruct-v0.1", system="s", user="u")
+        assert len(hf_called) == 0
+
+    def test_together_does_not_call_anthropic(self, monkeypatch):
+        monkeypatch.setattr(LLMClient, "_call_together", lambda self, **kw: "ok")
+        anthropic_called = []
+        monkeypatch.setattr(LLMClient, "_call_anthropic", lambda self, **kw: anthropic_called.append(1) or "x")
+        client = LLMClient({})
+        client.complete(model="together:mistralai/Mixtral-8x7B-Instruct-v0.1", system="s", user="u")
+        assert len(anthropic_called) == 0
+
+
 class TestUnknownModelFallback:
     def test_unknown_model_warns(self, monkeypatch):
         monkeypatch.setattr(LLMClient, "_call_anthropic", lambda self, **kw: "response")

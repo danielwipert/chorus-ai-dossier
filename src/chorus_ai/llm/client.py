@@ -2,7 +2,8 @@
 
 Supported providers (routing is automatic from the model name):
   - Anthropic: any model starting with "claude-"
-  - HuggingFace Inference API: any model containing "/" (e.g. "meta-llama/Llama-3.1-8B-Instruct")
+  - Together AI: any model starting with "together:" (e.g. "together:mistralai/Mixtral-8x7B-Instruct-v0.1")
+  - HuggingFace Inference API: any model containing "/" (e.g. "Qwen/Qwen2.5-72B-Instruct")
   - Unknown models: fall back to Anthropic haiku with a warning (same as before)
 
 All calls use temperature=0 for determinism (per CLAUDE.md Core Design Rules).
@@ -18,15 +19,22 @@ from typing import Any
 
 _FALLBACK_MODEL = "claude-haiku-4-5-20251001"
 _HF_BASE_URL = "https://router.huggingface.co/v1/"
+_TOGETHER_BASE_URL = "https://api.together.xyz/v1"
+_TOGETHER_PREFIX = "together:"
 
 
 def _is_anthropic(model: str) -> bool:
     return model.startswith("claude-")
 
 
+def _is_together(model: str) -> bool:
+    """Together AI models are prefixed with 'together:' (e.g. 'together:mistralai/Mixtral-8x7B-Instruct-v0.1')."""
+    return model.startswith(_TOGETHER_PREFIX)
+
+
 def _is_huggingface(model: str) -> bool:
-    """HuggingFace model names always contain a slash (e.g. 'meta-llama/Llama-3.1-8B-Instruct')."""
-    return "/" in model
+    """HuggingFace model names contain a slash but no provider prefix."""
+    return "/" in model and not _is_together(model)
 
 
 def parse_json_response(text: str) -> Any:
@@ -94,6 +102,15 @@ class LLMClient:
                 temperature=temperature,
             )
 
+        if _is_together(model):
+            return self._call_together(
+                model=model,
+                system=system,
+                user=user,
+                max_tokens=max_tokens,
+                temperature=temperature,
+            )
+
         if _is_huggingface(model):
             return self._call_huggingface(
                 model=model,
@@ -105,7 +122,7 @@ class LLMClient:
 
         # Unknown model — fall back to haiku with a warning
         warnings.warn(
-            f"Unknown model '{model}' is not Anthropic or HuggingFace; "
+            f"Unknown model '{model}' is not Anthropic, Together AI, or HuggingFace; "
             f"falling back to '{_FALLBACK_MODEL}'.",
             UserWarning,
             stacklevel=2,
@@ -181,4 +198,42 @@ class LLMClient:
         content = response.choices[0].message.content
         if content is None:
             raise RuntimeError(f"HuggingFace model '{model}' returned an empty response.")
+        return content
+
+    def _call_together(
+        self,
+        *,
+        model: str,
+        system: str,
+        user: str,
+        max_tokens: int,
+        temperature: float,
+    ) -> str:
+        try:
+            from openai import OpenAI
+        except ImportError as exc:
+            raise RuntimeError(
+                "openai package not installed. Run: pip install openai"
+            ) from exc
+
+        api_key = os.environ.get("TOGETHER_API_KEY")
+        if not api_key:
+            raise RuntimeError("TOGETHER_API_KEY environment variable is not set.")
+
+        # Strip the "together:" prefix before sending to the API
+        model_id = model[len(_TOGETHER_PREFIX):]
+
+        client = OpenAI(base_url=_TOGETHER_BASE_URL, api_key=api_key)
+        response = client.chat.completions.create(
+            model=model_id,
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+            max_tokens=max_tokens,
+            temperature=temperature,
+        )
+        content = response.choices[0].message.content
+        if content is None:
+            raise RuntimeError(f"Together AI model '{model_id}' returned an empty response.")
         return content
