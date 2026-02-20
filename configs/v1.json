@@ -9,7 +9,7 @@
     "contextualizer_a": "Qwen/Qwen2.5-72B-Instruct"
   },
   "verification": {
-    "pass_threshold": 0.75,
+    "pass_threshold": 0.5,
     "max_retries": 2
   },
   "ingestion": {

@@ -170,6 +170,19 @@ def run_export(run_dir: str) -> dict:
             "No contextual analysis was generated; external context section is absent."
         )
 
+    # Flag lowered verification threshold prominently
+    _DEFAULT_THRESHOLD = 0.75
+    _applied_threshold = verification.get("pass_threshold") if verification else None
+    if _applied_threshold is not None and _applied_threshold < _DEFAULT_THRESHOLD:
+        _threshold_notice = (
+            f"VERIFICATION NOTICE: This dossier was produced using a reduced fact-coverage "
+            f"threshold of {_applied_threshold} (standard is {_DEFAULT_THRESHOLD}). "
+            f"One or more summaries may have lower grounding fidelity than a standard run. "
+            f"Treat conclusions with additional scrutiny."
+        )
+        pipeline_warnings.insert(0, _threshold_notice)
+        risks_and_limitations = _threshold_notice + "\n\n" + risks_and_limitations
+
     audit_trail = _build_audit_trail(
         run_root, ingestion, fact_list, verification, compiled, status
     )
