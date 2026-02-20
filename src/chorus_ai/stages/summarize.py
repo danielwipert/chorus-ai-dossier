@@ -71,7 +71,7 @@ def generate_summary_for_slot(
             model=model,
             system=system_prompt,
             user=f"Summarize the following document:\n\n{document_text}",
-            max_tokens=2048,
+            max_tokens=4096,
         )
     except Exception as exc:
         raise ChorusFatalError(
