@@ -1,5 +1,6 @@
 import argparse
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 
 from chorus_ai.core.config import load_and_canonicalize_config
@@ -76,6 +77,8 @@ def main(argv=None) -> int:
         ),
     )
     args = parser.parse_args(argv)
+
+    run_root: Path | None = None
 
     try:
         pdf_path = Path(args.pdf).expanduser().resolve()
@@ -183,12 +186,20 @@ def main(argv=None) -> int:
         return 0
 
     except ChorusFatalError as e:
-        print(
-            json.dumps(
-                {"ok": False, "error": e.code, "message": str(e), "details": e.details},
-                indent=2,
-            )
-        )
+        payload = {"ok": False, "error": e.code, "message": str(e), "details": e.details}
+        # Persist failure artifact so the run folder is fully inspectable after a crash
+        if run_root is not None and run_root.exists():
+            failure = {
+                **payload,
+                "failed_at": datetime.now(timezone.utc).isoformat(),
+            }
+            try:
+                (run_root / "00_meta" / "failure.json").write_text(
+                    json.dumps(failure, indent=2), encoding="utf-8"
+                )
+            except Exception:
+                pass  # never let failure-artifact writing mask the original error
+        print(json.dumps(payload, indent=2))
         return 2
 
 

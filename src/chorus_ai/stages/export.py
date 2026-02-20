@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from chorus_ai.runs.status import require_state, set_state
+from chorus_ai.stages.pdf_renderer import render_dossier_pdf
 
 
 def _utc_now() -> str:
@@ -200,10 +201,22 @@ def run_export(run_dir: str) -> dict:
     out_path = out_dir / "final_dossier.json"
     _write_json(out_path, final_dossier)
 
+    # Render PDF
+    pdf_path = out_dir / "final_dossier.pdf"
+    pdf_warnings: List[str] = []
+    try:
+        render_dossier_pdf(final_dossier, pdf_path)
+        final_dossier["export_paths"].append("70_export/final_dossier.pdf")
+        # Re-write JSON with updated export_paths
+        _write_json(out_path, final_dossier)
+    except Exception as exc:
+        pdf_warnings.append(f"PDF rendering failed: {exc}")
+
     set_state(run_root, "FINALIZED")
 
     return {
         "ok": True,
         "artifact": str(out_path),
-        "warnings": pipeline_warnings,
+        "pdf": str(pdf_path) if pdf_path.exists() else None,
+        "warnings": pipeline_warnings + pdf_warnings,
     }

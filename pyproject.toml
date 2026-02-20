@@ -16,6 +16,7 @@ dependencies = [
   "rich>=13.7",
   "anthropic>=0.82",
   "pdfplumber>=0.11",
+  "reportlab>=4.0",
 ]
 
 [project.optional-dependencies]

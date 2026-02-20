@@ -9,3 +9,12 @@ __pycache__/
 runs/
 *.log
 .DS_Store
+
+# Auto-generated package metadata
+src/*.egg-info/
+
+# Generated artifacts
+sample_dossier.pdf
+
+# Claude Code local config
+.claude/
