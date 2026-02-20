@@ -3,7 +3,7 @@
   "models": {
     "summarizer_a": "claude-haiku-4-5-20251001",
     "summarizer_b": "Qwen/Qwen2.5-72B-Instruct",
-    "summarizer_c": "meta-llama/Llama-3.3-70B-Instruct",
+    "summarizer_c": "mistralai/Mixtral-8x7B-Instruct-v0.1",
     "fact_finder": "claude-haiku-4-5-20251001",
     "compiler": "claude-sonnet-4-6",
     "contextualizer_a": "Qwen/Qwen2.5-72B-Instruct"
