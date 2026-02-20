@@ -10,10 +10,14 @@
   },
   "verification": {
     "pass_threshold": 0.5,
-    "max_retries": 2
+    "max_retries": 2,
+    "max_sample_facts": 40
   },
   "ingestion": {
     "min_chars_per_page": 50
+  },
+  "extraction": {
+    "pages_per_chunk": 3
   },
   "output": {
     "include_audit_trail": true

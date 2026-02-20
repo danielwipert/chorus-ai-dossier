@@ -5,13 +5,15 @@ verify_summary_v1() is the primary callable from stages/verify.py.
 
 Per-summary pipeline:
   1. Structural check: schema fields present and typed correctly.
-  2. Semantic scoring: LLM coverage check of facts vs. summary text.
-     - coverage_score = covered_facts / total_facts
+  2. Semantic scoring: LLM coverage check of a sampled subset of facts vs. summary text.
+     - A deterministic stratified sample (by fact type) is used to keep LLM output within
+       token limits. coverage_score = covered_facts / sample_size.
      - threshold configurable (default 0.75)
   3. Pass rule: at least 2 summaries must pass both checks.
 """
 from __future__ import annotations
 
+from collections import defaultdict
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -108,11 +110,47 @@ def _structural_check(summary: Dict[str, Any], fact_count: int) -> Dict[str, Any
     return {"status": status, "checks": checks}
 
 
+_MAX_SAMPLE_FACTS_DEFAULT = 40
+
+
+def _sample_facts(facts: List[Dict[str, Any]], max_sample: int) -> List[Dict[str, Any]]:
+    """
+    Deterministic stratified sample of facts by type.
+
+    Facts are already ordered by fact_id. Within each type bucket we take
+    evenly-spaced elements so the sample spans the full document rather than
+    clustering at the start. Returns at most max_sample facts sorted by fact_id.
+    """
+    if len(facts) <= max_sample:
+        return facts
+
+    # Group by type, preserving fact_id order within each bucket
+    by_type: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+    for f in facts:
+        by_type[f.get("type", "empirical_claim")].append(f)
+
+    n_types = len(by_type)
+    per_type = max(1, max_sample // n_types)
+
+    sampled: List[Dict[str, Any]] = []
+    for type_facts in by_type.values():
+        if len(type_facts) <= per_type:
+            sampled.extend(type_facts)
+        else:
+            step = len(type_facts) / per_type
+            sampled.extend(type_facts[int(i * step)] for i in range(per_type))
+
+    # Sort by fact_id for a stable, deterministic output ordering
+    sampled.sort(key=lambda f: f.get("fact_id", ""))
+    return sampled[:max_sample]
+
+
 def _semantic_score(
     summary: Dict[str, Any],
     facts: List[Dict[str, Any]],
     llm_client: Any,
     compiler_model: str,
+    max_sample_facts: int = _MAX_SAMPLE_FACTS_DEFAULT,
 ) -> Dict[str, Any]:
     """
     Call the LLM to score the summary's coverage of the fact list.
@@ -130,13 +168,21 @@ def _semantic_score(
             "error": None,
         }
 
+    sample = _sample_facts(facts, max_sample_facts)
+    sampled = len(sample) < len(facts)
+
     system_prompt = load_prompt("verify_system")
     facts_text = "\n".join(
         f'  {{"fact_id": "{f["fact_id"]}", "claim": "{f["claim"]}"}}'
-        for f in facts
+        for f in sample
+    )
+    sample_note = (
+        f" (stratified sample of {len(sample)} from {len(facts)} total)"
+        if sampled
+        else ""
     )
     user_content = (
-        f"FACTS ({len(facts)} total):\n[\n{facts_text}\n]\n\n"
+        f"FACTS ({len(sample)} total{sample_note}):\n[\n{facts_text}\n]\n\n"
         f"SUMMARY TO EVALUATE:\n{summary.get('summary_text', '')}"
     )
 
@@ -145,7 +191,7 @@ def _semantic_score(
             model=compiler_model,
             system=system_prompt,
             user=user_content,
-            max_tokens=4096,
+            max_tokens=8192,
         )
         parsed = parse_json_response(raw)
     except Exception as exc:
@@ -177,6 +223,7 @@ def verify_summary_v1(
     llm_client: Optional[Any] = None,
     compiler_model: str = "claude-sonnet-4-6",
     pass_threshold: float = 0.75,
+    max_sample_facts: int = _MAX_SAMPLE_FACTS_DEFAULT,
 ) -> Dict[str, Any]:
     """
     Core verification entrypoint callable from stages/verify.py.
@@ -226,7 +273,9 @@ def verify_summary_v1(
         coverage_score = 0.0
 
         if structural["status"] == "pass" and llm_client is not None:
-            semantic = _semantic_score(summary, facts, llm_client, compiler_model)
+            semantic = _semantic_score(
+                summary, facts, llm_client, compiler_model, max_sample_facts
+            )
             coverage_score = semantic.get("coverage_score", 0.0)
             if semantic.get("error"):
                 warnings.append(

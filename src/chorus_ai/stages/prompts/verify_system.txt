@@ -11,7 +11,7 @@ For each fact, determine:
 - A fact is "covered" if the summary contains a claim that accurately conveys the fact's content.
 - A fact is "not covered" if it is absent, misrepresented, or contradicted in the summary.
 
-Also identify unsupported claims: substantive claims in the summary that are NOT backed by any fact in the list. Do not flag general connective phrases, only substantive claims.
+Also identify unsupported claims: substantive claims in the summary that are NOT backed by any fact in the list. Do not flag general connective phrases, only substantive claims. Report at most 5 unsupported claims.
 
 Compute:
   coverage_score = covered_facts / total_facts

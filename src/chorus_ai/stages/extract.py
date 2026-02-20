@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -60,6 +61,73 @@ def _validate_facts(facts: List[Any]) -> List[Dict[str, Any]]:
     return valid
 
 
+_PAGES_PER_CHUNK_DEFAULT = 3
+
+
+def _split_into_page_chunks(document_text: str, pages_per_chunk: int) -> List[str]:
+    """Split document text into chunks of N pages using [PAGE N] markers."""
+    # Split on [PAGE N] markers, keeping the markers
+    parts = re.split(r"(\[PAGE \d+\])", document_text)
+
+    # Pair each marker with the text that follows it
+    pages: List[str] = []
+    i = 0
+    while i < len(parts):
+        if re.match(r"\[PAGE \d+\]", parts[i]):
+            header = parts[i]
+            body = parts[i + 1] if i + 1 < len(parts) else ""
+            pages.append(header + body)
+            i += 2
+        else:
+            i += 1
+
+    if not pages:
+        # No [PAGE N] markers — treat whole document as one chunk
+        return [document_text]
+
+    # Group pages into chunks of pages_per_chunk
+    chunks: List[str] = []
+    for start in range(0, len(pages), pages_per_chunk):
+        chunk = "\n".join(pages[start : start + pages_per_chunk]).strip()
+        chunks.append(chunk)
+
+    return chunks
+
+
+def _extract_facts_from_chunk(
+    llm: LLMClient,
+    model: str,
+    system_prompt: str,
+    chunk_text: str,
+    chunk_index: int,
+) -> List[Dict[str, Any]]:
+    """Run the extraction LLM call on a single chunk and return raw fact dicts."""
+    try:
+        raw = llm.complete(
+            model=model,
+            system=system_prompt,
+            user=f"Extract all facts from the following document:\n\n{chunk_text}",
+            max_tokens=8192,
+        )
+    except Exception as exc:
+        raise ChorusFatalError(
+            "LLM_CALL_FAILED",
+            f"Fact extraction LLM call failed on chunk {chunk_index}: {exc}",
+            {"model": model, "chunk_index": chunk_index},
+        ) from exc
+
+    try:
+        parsed = parse_json_response(raw)
+    except ValueError as exc:
+        raise ChorusFatalError(
+            "LLM_BAD_JSON",
+            f"Fact extractor returned non-JSON output on chunk {chunk_index}: {exc}",
+            {"model": model, "chunk_index": chunk_index, "raw_preview": raw[:300]},
+        ) from exc
+
+    return parsed.get("facts", []) if isinstance(parsed, dict) else []
+
+
 def run_extract(run_root: Path, force: bool = False) -> None:
     """
     Stage 2: EXTRACTION (Fact Finder)
@@ -95,35 +163,25 @@ def run_extract(run_root: Path, force: bool = False) -> None:
 
     config = load_run_config(run_root)
     model = config.get("models", {}).get("fact_finder", "claude-haiku-4-5-20251001")
+    pages_per_chunk = config.get("extraction", {}).get(
+        "pages_per_chunk", _PAGES_PER_CHUNK_DEFAULT
+    )
 
     llm = LLMClient(config)
     system_prompt = load_prompt("extract_system")
 
-    try:
-        raw = llm.complete(
-            model=model,
-            system=system_prompt,
-            user=f"Extract all facts from the following document:\n\n{document_text}",
-            max_tokens=8192,
-        )
-    except Exception as exc:
-        raise ChorusFatalError(
-            "LLM_CALL_FAILED",
-            f"Fact extraction LLM call failed: {exc}",
-            {"model": model},
-        ) from exc
+    chunks = _split_into_page_chunks(document_text, pages_per_chunk)
 
-    try:
-        parsed = parse_json_response(raw)
-    except ValueError as exc:
-        raise ChorusFatalError(
-            "LLM_BAD_JSON",
-            f"Fact extractor returned non-JSON output: {exc}",
-            {"model": model, "raw_preview": raw[:300]},
-        ) from exc
+    all_raw_facts: List[Dict[str, Any]] = []
+    for i, chunk in enumerate(chunks):
+        chunk_facts = _extract_facts_from_chunk(llm, model, system_prompt, chunk, i)
+        all_raw_facts.extend(chunk_facts)
 
-    raw_facts = parsed.get("facts", []) if isinstance(parsed, dict) else []
-    facts = _validate_facts(raw_facts)
+    facts = _validate_facts(all_raw_facts)
+
+    # Renumber fact IDs globally so they are unique across chunks
+    for idx, fact in enumerate(facts):
+        fact["fact_id"] = f"F{idx + 1:03d}"
 
     fact_set_id = f"FACTSET_{source_sha[:12]}"
     fact_list: Dict[str, Any] = {

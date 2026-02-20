@@ -71,10 +71,10 @@ def run_verify(run_dir: str) -> dict:
     require_state(run_root, "SUMMARIZED")
 
     config = load_run_config(run_root)
-    pass_threshold = float(
-        config.get("verification", {}).get("pass_threshold", 0.75)
-    )
-    max_retries = int(config.get("verification", {}).get("max_retries", 2))
+    verification_cfg = config.get("verification", {})
+    pass_threshold = float(verification_cfg.get("pass_threshold", 0.75))
+    max_retries = int(verification_cfg.get("max_retries", 2))
+    max_sample_facts = int(verification_cfg.get("max_sample_facts", 40))
     compiler_model = config.get("models", {}).get("compiler", "claude-sonnet-4-6")
 
     status = _read_status(run_root)
@@ -103,6 +103,7 @@ def run_verify(run_dir: str) -> dict:
             llm_client=llm,
             compiler_model=compiler_model,
             pass_threshold=pass_threshold,
+            max_sample_facts=max_sample_facts,
         )
 
         if report["status"] == "pass":
