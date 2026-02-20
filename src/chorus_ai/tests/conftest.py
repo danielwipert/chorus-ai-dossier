@@ -89,7 +89,7 @@ _LLM_RESPONSES: Dict[str, str] = {
             "warnings": [],
         }
     ),
-    "summarizer": SAMPLE_SUMMARY_TEXT,
+    "fact-reporter": SAMPLE_SUMMARY_TEXT,
     "verification expert": json.dumps(
         {
             "total_facts": 2,
