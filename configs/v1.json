@@ -6,8 +6,7 @@
     "summarizer_c": "meta-llama/Llama-3.3-70B-Instruct",
     "fact_finder": "claude-haiku-4-5-20251001",
     "compiler": "claude-sonnet-4-6",
-    "contextualizer_a": "Qwen/Qwen2.5-72B-Instruct",
-    "contextualizer_b": "meta-llama/Llama-3.1-70B-Instruct"
+    "contextualizer_a": "Qwen/Qwen2.5-72B-Instruct"
   },
   "verification": {
     "pass_threshold": 0.75,

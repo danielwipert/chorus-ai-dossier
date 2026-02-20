@@ -11,10 +11,9 @@ from chorus_ai.core.errors import ChorusFatalError
 from chorus_ai.llm.client import LLMClient, load_prompt, parse_json_response
 from chorus_ai.runs.status import require_state, set_state
 
-_CONTEXT_SLOTS = ["contextualizer_a", "contextualizer_b"]
+_CONTEXT_SLOTS = ["contextualizer_a"]
 _SLOT_FILENAMES = {
     "contextualizer_a": "contextual_a.json",
-    "contextualizer_b": "contextual_b.json",
 }
 
 
@@ -99,14 +98,14 @@ def run_contextualize(run_root: Path) -> dict:
     """
     Stage 5: CONTEXTUAL ANALYSIS
 
-    NON-FATAL: if both context models fail, the stage notes the gap and continues.
+    NON-FATAL: if the context model fails, the stage notes the gap and continues.
 
     Preconditions:
       - run state must be VERIFIED
       - 40_verification/verification_report.json must exist
 
     Postconditions:
-      - 50_contextual/contextual_a.json and/or contextual_b.json written
+      - 50_contextual/contextual_a.json written (if model succeeds)
       - status.json["contextual_analyses"] updated
       - run state becomes CONTEXTUALIZED
 

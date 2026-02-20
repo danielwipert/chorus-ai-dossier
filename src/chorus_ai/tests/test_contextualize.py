@@ -22,7 +22,6 @@ class TestRunContextualize:
 
         assert result["ok"] is True
         assert (run_root / "50_contextual" / "contextual_a.json").exists()
-        assert (run_root / "50_contextual" / "contextual_b.json").exists()
 
     def test_contextual_artifact_structure(self, tmp_path, mock_llm):
         run_root = make_run_dir(tmp_path)
@@ -52,7 +51,7 @@ class TestRunContextualize:
         assert len(status["contextual_analyses"]) > 0
 
     def test_nonfatal_on_llm_failure(self, tmp_path, monkeypatch):
-        """If both contextualizer models fail, stage still returns ok=True."""
+        """If the contextualizer model fails, stage still returns ok=True."""
         monkeypatch.setattr(
             LLMClient, "_call_anthropic",
             lambda self, **kw: (_ for _ in ()).throw(RuntimeError("API down"))
