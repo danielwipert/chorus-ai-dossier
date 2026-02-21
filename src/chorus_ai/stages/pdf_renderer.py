@@ -77,6 +77,40 @@ def _styles() -> Dict[str, ParagraphStyle]:
             spaceAfter=8,
             leading=36,
         ),
+        "cover_doc_title": ParagraphStyle(
+            "cover_doc_title",
+            fontName="Times-Italic",
+            fontSize=14,
+            textColor=_BLACK,
+            alignment=TA_CENTER,
+            spaceAfter=4,
+            leading=20,
+        ),
+        "cover_doc_byline": ParagraphStyle(
+            "cover_doc_byline",
+            fontName="Helvetica",
+            fontSize=9,
+            textColor=_GRAY,
+            alignment=TA_CENTER,
+            spaceAfter=0,
+        ),
+        "cover_process_label": ParagraphStyle(
+            "cover_process_label",
+            fontName="Helvetica-Bold",
+            fontSize=7,
+            textColor=_GRAY,
+            spaceAfter=4,
+            spaceBefore=16,
+        ),
+        "cover_process_body": ParagraphStyle(
+            "cover_process_body",
+            fontName="Times-Roman",
+            fontSize=9,
+            textColor=_BLACK,
+            alignment=TA_JUSTIFY,
+            leading=14,
+            spaceAfter=0,
+        ),
         "cover_meta_key": ParagraphStyle(
             "cover_meta_key",
             fontName="Helvetica-Bold",
@@ -241,6 +275,33 @@ def _styles() -> Dict[str, ParagraphStyle]:
             spaceAfter=0,
             leading=11,
         ),
+        "model_attribution": ParagraphStyle(
+            "model_attribution",
+            fontName="Helvetica",
+            fontSize=7.5,
+            textColor=_GRAY,
+            spaceAfter=10,
+            leading=11,
+        ),
+        "roster_role": ParagraphStyle(
+            "roster_role",
+            fontName="Helvetica-Bold",
+            fontSize=8.5,
+            textColor=_BLACK,
+        ),
+        "roster_model": ParagraphStyle(
+            "roster_model",
+            fontName="Courier",
+            fontSize=8,
+            textColor=_GRAY,
+        ),
+        "roster_desc": ParagraphStyle(
+            "roster_desc",
+            fontName="Times-Italic",
+            fontSize=9,
+            textColor=_GRAY,
+            leading=13,
+        ),
         # Compiled summary — editorial typography
         # Lead: first paragraph, flush left (no indent), slightly larger, generous air
         "summary_lead": ParagraphStyle(
@@ -280,26 +341,34 @@ def _section_block(num: int, title: str, s: Dict[str, ParagraphStyle]) -> List:
 
 
 def _cover_elements(dossier: Dict[str, Any], s: Dict[str, ParagraphStyle]) -> List:
-    sha = dossier.get("source_doc_sha256", "")
-    sha_display = (sha[:32] + "\u2026") if len(sha) > 32 else sha
-    dossier_id = dossier.get("dossier_id", "UNKNOWN")
     created = dossier.get("created_at", "")[:19].replace("T", " ")
     run_status = dossier.get("run_status", "complete").upper()
+    doc_meta = dossier.get("document_meta", {})
+    process_description = dossier.get("process_description", "")
 
     elements: List = [Spacer(1, 1.4 * inch)]
 
     elements.append(_hrule(thick=2.5, color=_RED, after=20))
-    elements.append(Paragraph("CHORUS AI", s["cover_eyebrow"]))
-    elements.append(Paragraph("INTELLIGENCE DOSSIER", s["cover_title"]))
+    elements.append(Paragraph("CHORUS AI  \u00b7  INTELLIGENCE DOSSIER", s["cover_eyebrow"]))
+    elements.append(Paragraph("Summary Dossier", s["cover_title"]))
+
+    # Document title, author, publication (if available from PDF metadata)
+    if doc_meta.get("title"):
+        elements.append(Spacer(1, 0.06 * inch))
+        elements.append(Paragraph(_e(doc_meta["title"]), s["cover_doc_title"]))
+    byline_parts = []
+    if doc_meta.get("author"):
+        byline_parts.append(doc_meta["author"])
+    if doc_meta.get("subject"):
+        byline_parts.append(doc_meta["subject"])
+    if byline_parts:
+        elements.append(Paragraph(_e("  \u00b7  ".join(byline_parts)), s["cover_doc_byline"]))
+
     elements.append(_hrule(thick=2.5, color=_RED, after=28))
     elements.append(Spacer(1, 0.25 * inch))
 
     col_w = [2.0 * inch, CONTENT_W - 2.0 * inch]
     meta_rows = [
-        [Paragraph("DOSSIER ID", s["cover_meta_key"]),
-         Paragraph(_e(dossier_id), s["cover_meta_val"])],
-        [Paragraph("SOURCE SHA-256", s["cover_meta_key"]),
-         Paragraph(_e(sha_display), s["cover_meta_val"])],
         [Paragraph("GENERATED", s["cover_meta_key"]),
          Paragraph(_e(created + " UTC"), s["cover_meta_val"])],
         [Paragraph("PIPELINE", s["cover_meta_key"]),
@@ -317,13 +386,11 @@ def _cover_elements(dossier: Dict[str, Any], s: Dict[str, ParagraphStyle]) -> Li
     t.setStyle(meta_ts)
     elements.append(t)
 
-    warnings = dossier.get("warnings", [])
-    if warnings:
-        elements.append(Spacer(1, 0.35 * inch))
-        elements.append(_hrule(thick=0.5, color=_RED, after=6))
-        elements.append(Paragraph("PIPELINE WARNINGS", s["section_eyebrow"]))
-        for w in warnings:
-            elements.append(Paragraph(f"\u2022 {_e(w)}", s["warning_text"]))
+    # Process description — how this report was made, in plain English
+    if process_description:
+        elements.append(Paragraph("HOW THIS REPORT WAS MADE", s["cover_process_label"]))
+        elements.append(_hrule(thick=0.25, color=_LIGHT_GRAY, after=6))
+        elements.append(Paragraph(_e(process_description), s["cover_process_body"]))
 
     elements.append(PageBreak())
     return elements
@@ -427,6 +494,7 @@ def _audit_table_elements(audit: Dict[str, Any], s: Dict[str, ParagraphStyle]) -
 
     verification = audit.get("verification", {})
     rows = [
+        _row("Dossier ID", audit.get("dossier_id", "")),
         _row("Source SHA-256", audit.get("source_doc_sha256", "")),
         _row("Page Count", audit.get("page_count", "")),
         _row("Total Characters", f"{audit.get('total_chars', 0):,}"),
@@ -527,6 +595,50 @@ def _compiled_summary_elements(text: str, s: Dict[str, ParagraphStyle]) -> List:
     return elements
 
 
+def _model_attribution(text: str, s: Dict[str, ParagraphStyle]) -> List:
+    """Small gray attribution line placed directly after a section's HR rule."""
+    if not text:
+        return []
+    return [Paragraph(_e(text), s["model_attribution"])]
+
+
+def _model_roster_elements(roster: List[Dict[str, Any]], s: Dict[str, ParagraphStyle]) -> List:
+    """
+    Render the model roster as a table:  Role | Model ID | Description
+    """
+    if not roster:
+        return [Paragraph("[No model information available.]", s["body"])]
+
+    col_w = [1.5 * inch, 1.7 * inch, CONTENT_W - 1.5 * inch - 1.7 * inch]
+    rows = []
+    for entry in roster:
+        rows.append([
+            Paragraph(_e(entry.get("role", "")), s["roster_role"]),
+            Paragraph(_e(entry.get("model_id", "").replace("together:", "")), s["roster_model"]),
+            Paragraph(_e(entry.get("description", "")), s["roster_desc"]),
+        ])
+
+    ts = TableStyle([
+        ("TOPPADDING",    (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ("LINEBELOW",     (0, 0), (-1, -2), 0.25, _LIGHT_GRAY),
+        ("VALIGN",        (0, 0), (-1, -1), "TOP"),
+    ])
+    t = Table(rows, colWidths=col_w)
+    t.setStyle(ts)
+    return [t]
+
+
+def _pipeline_warnings_elements(warnings: List[str], s: Dict[str, ParagraphStyle]) -> List:
+    """Render pipeline warnings as a bulleted list with red text."""
+    if not warnings:
+        return []
+    elements: List = []
+    for w in warnings:
+        elements.append(Paragraph(f"\u2022 {_e(w)}", s["warning_text"]))
+    return elements
+
+
 def _draw_page(canvas: Any, doc: Any, dossier_id: str, created: str) -> None:
     """Render header and footer on every non-cover page."""
     if canvas.getPageNumber() == 1:
@@ -558,18 +670,22 @@ def render_dossier_pdf(dossier: Dict[str, Any], out_path: Path) -> None:
     Render a FinalDossier dict to a formatted PDF at out_path.
 
     Sections rendered:
-      Cover page (dossier ID, SHA, pipeline metadata)
+      Cover page (title, document metadata, process description)
       01 – Executive Overview
       02 – Compiled Summary
       03 – Contextual Analysis
       04 – Risks, Limitations, and Warnings
       05 – Verification Receipt (key claims fact-check log)
-      06 – Audit Trail
+      06 – Audit Trail (includes Dossier ID and Source SHA)
+      07 – Model Roster
+      08 – Pipeline Notices (only if warnings present)
     """
     s = _styles()
     sections = dossier.get("sections", {})
     dossier_id = dossier.get("dossier_id", "UNKNOWN")
     created = dossier.get("created_at", "")[:19].replace("T", " ")
+    attr = dossier.get("section_attributions", {})
+    roster = dossier.get("model_roster", [])
 
     def _on_page(canvas: Any, doc: Any) -> None:
         _draw_page(canvas, doc, dossier_id, created)
@@ -590,17 +706,20 @@ def render_dossier_pdf(dossier: Dict[str, Any], out_path: Path) -> None:
 
     # 01 — Executive Overview
     story.extend(_section_block(1, "EXECUTIVE OVERVIEW", s))
+    story.extend(_model_attribution(attr.get("1", ""), s))
     overview = sections.get("executive_overview", "[Not available.]")
     story.append(Paragraph(_e(overview), s["body"]))
 
     # 02 — Compiled Summary
     story.extend(_section_block(2, "COMPILED SUMMARY", s))
+    story.extend(_model_attribution(attr.get("2", ""), s))
     story.extend(_compiled_summary_elements(
         sections.get("compiled_summary", "[Not available.]"), s
     ))
 
     # 03 — Contextual Analysis
     story.extend(_section_block(3, "CONTEXTUAL ANALYSIS", s))
+    story.extend(_model_attribution(attr.get("3", ""), s))
     story.append(Paragraph(
         "External context provided by contextualizer models. All claims in this section "
         "are sourced from external references and are explicitly labeled as such.",
@@ -612,15 +731,27 @@ def render_dossier_pdf(dossier: Dict[str, Any], out_path: Path) -> None:
 
     # 04 — Risks, Limitations, and Warnings
     story.extend(_section_block(4, "RISKS, LIMITATIONS, AND WARNINGS", s))
+    story.extend(_model_attribution(attr.get("4", ""), s))
     risks = sections.get("risks_and_limitations", "[No risks or limitations identified.]")
     story.append(Paragraph(_e(risks), s["body"]))
 
     # 05 — Verification Receipt
     story.extend(_section_block(5, "VERIFICATION RECEIPT", s))
+    story.extend(_model_attribution(attr.get("5", ""), s))
     story.extend(_verification_receipt_elements(sections.get("key_claims", []), s))
 
     # 06 — Audit Trail
     story.extend(_section_block(6, "AUDIT TRAIL", s))
     story.extend(_audit_table_elements(sections.get("audit_trail", {}), s))
+
+    # 07 — Model Roster
+    story.extend(_section_block(7, "MODEL ROSTER", s))
+    story.extend(_model_roster_elements(roster, s))
+
+    # 08 — Pipeline Notices (only if warnings present)
+    warnings = dossier.get("warnings", [])
+    if warnings:
+        story.extend(_section_block(8, "PIPELINE NOTICES", s))
+        story.extend(_pipeline_warnings_elements(warnings, s))
 
     doc.build(story, onFirstPage=_on_page, onLaterPages=_on_page)
