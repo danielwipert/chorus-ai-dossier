@@ -134,7 +134,6 @@ def _build_process_description(
     n_passing = len(audit.get("passing_summaries", []))
     n_contextual = len(audit.get("contextual_analyses", []))
     fact_count = audit.get("fact_count", 0)
-    threshold = (verification.get("pass_threshold") if verification else None) or 0.75
 
     summary_clause = (
         f"three separate AI models" if n_summaries == 3
@@ -161,8 +160,8 @@ def _build_process_description(
         f"each working without knowledge of the others' outputs. "
         f"A dedicated fact-extraction model then catalogued {fact_count} discrete "
         f"claims directly from the original text, creating a locked fact list. "
-        f"A verification model scored each summary against that fact list; "
-        f"{passing_clause} met the {threshold:.0%} coverage threshold and advanced. "
+        f"A verification model checked each summary against that fact list for contradictions; "
+        f"{passing_clause} passed the hallucination check and advanced. "
         f"A compiler model synthesized the passing summaries into a single coherent "
         f"analysis, retaining only claims corroborated by multiple sources. "
         f"{context_clause}"
@@ -209,13 +208,15 @@ def _build_audit_trail(
         "contextual_analyses": status.get("contextual_analyses", []),
         "verification": {
             "status": verification.get("status") if verification else "not_run",
-            "pass_threshold": verification.get("pass_threshold") if verification else None,
+            "max_contradiction_score": verification.get("max_contradiction_score") if verification else None,
             "retries_used": verification.get("retries_used", 0) if verification else 0,
             "summary_scores": [
                 {
                     "summary_id": r.get("summary_id"),
                     "model_slot": r.get("model_slot"),
+                    "contradiction_score": r.get("contradiction_score"),
                     "coverage_score": r.get("coverage_score"),
+                    "passes_contradiction_check": r.get("passes_contradiction_check"),
                     "status": r.get("status"),
                 }
                 for r in (verification.get("summary_results", []) if verification else [])
@@ -334,19 +335,6 @@ def run_export(run_dir: str) -> dict:
         pipeline_warnings.append(
             "No contextual analysis was generated; external context section is absent."
         )
-
-    # Flag lowered verification threshold prominently
-    _DEFAULT_THRESHOLD = 0.75
-    _applied_threshold = verification.get("pass_threshold") if verification else None
-    if _applied_threshold is not None and _applied_threshold < _DEFAULT_THRESHOLD:
-        _threshold_notice = (
-            f"VERIFICATION NOTICE: This dossier was produced using a reduced fact-coverage "
-            f"threshold of {_applied_threshold} (standard is {_DEFAULT_THRESHOLD}). "
-            f"One or more summaries may have lower grounding fidelity than a standard run. "
-            f"Treat conclusions with additional scrutiny."
-        )
-        pipeline_warnings.insert(0, _threshold_notice)
-        risks_and_limitations = _threshold_notice + "\n\n" + risks_and_limitations
 
     # --- Build final dossier ---
     dossier_id = f"DOS_{source_sha[:12]}"

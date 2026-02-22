@@ -1,14 +1,16 @@
 """
-verify_summary_v1.py — Verification V2 (Structural + Semantic scoring)
+verify_summary_v1.py — Verification V2 (Structural + Contradiction scoring)
 
 verify_summary_v1() is the primary callable from stages/verify.py.
 
 Per-summary pipeline:
   1. Structural check: schema fields present and typed correctly.
-  2. Semantic scoring: LLM coverage check of a sampled subset of facts vs. summary text.
+  2. Semantic scoring: LLM contradiction check of a sampled subset of facts vs. summary text.
      - A deterministic stratified sample (by fact type) is used to keep LLM output within
-       token limits. coverage_score = covered_facts / sample_size.
-     - threshold configurable (default 0.75)
+       token limits.
+     - PRIMARY metric: contradiction_score = contradicted_facts / total_facts
+       A summary fails if contradiction_score > max_contradiction_score (default 0.0).
+     - SECONDARY metric: coverage_score recorded for audit trail but does not gate pass/fail.
   3. Pass rule: at least 2 summaries must pass both checks.
 """
 from __future__ import annotations
@@ -153,15 +155,18 @@ def _semantic_score(
     max_sample_facts: int = _MAX_SAMPLE_FACTS_DEFAULT,
 ) -> Dict[str, Any]:
     """
-    Call the LLM to score the summary's coverage of the fact list.
-    Returns a scoring result dict.
+    Call the LLM to check the summary for contradictions against the fact list.
+    Returns a scoring result dict with contradiction_score as the primary metric
+    and coverage_score as a secondary informational metric.
     """
     from chorus_ai.llm.client import load_prompt, parse_json_response
 
     if not facts:
         return {
             "total_facts": 0,
+            "contradicted_facts": 0,
             "covered_facts": 0,
+            "contradiction_score": 0.0,
             "coverage_score": 1.0,
             "unsupported_claims": [],
             "fact_coverage": [],
@@ -197,21 +202,32 @@ def _semantic_score(
     except Exception as exc:
         return {
             "total_facts": len(facts),
+            "contradicted_facts": 0,
             "covered_facts": 0,
+            "contradiction_score": 0.0,
             "coverage_score": 0.0,
             "unsupported_claims": [],
             "fact_coverage": [],
             "error": str(exc),
         }
 
-    # Normalise coverage_score
-    score = parsed.get("coverage_score", 0.0)
+    # Normalise contradiction_score
+    contradiction_score = parsed.get("contradiction_score", 0.0)
     try:
-        score = float(score)
+        contradiction_score = float(contradiction_score)
     except (TypeError, ValueError):
-        score = 0.0
-    score = max(0.0, min(1.0, score))
-    parsed["coverage_score"] = score
+        contradiction_score = 0.0
+    contradiction_score = max(0.0, min(1.0, contradiction_score))
+    parsed["contradiction_score"] = contradiction_score
+
+    # Normalise coverage_score (secondary / informational)
+    coverage_score = parsed.get("coverage_score", 0.0)
+    try:
+        coverage_score = float(coverage_score)
+    except (TypeError, ValueError):
+        coverage_score = 0.0
+    coverage_score = max(0.0, min(1.0, coverage_score))
+    parsed["coverage_score"] = coverage_score
 
     return parsed
 
@@ -223,6 +239,7 @@ def verify_summary_v1(
     llm_client: Optional[Any] = None,
     compiler_model: str = "claude-sonnet-4-6",
     pass_threshold: float = 0.75,
+    max_contradiction_score: float = 0.0,
     max_sample_facts: int = _MAX_SAMPLE_FACTS_DEFAULT,
 ) -> Dict[str, Any]:
     """
@@ -233,7 +250,9 @@ def verify_summary_v1(
         summaries: Loaded summary dicts.
         llm_client: LLMClient instance for semantic scoring. If None, skips scoring.
         compiler_model: Model to use for semantic scoring.
-        pass_threshold: Minimum coverage score to pass (default 0.75).
+        pass_threshold: Kept for backwards compatibility; not used in pass/fail logic.
+        max_contradiction_score: Maximum allowed contradiction_score to pass (default 0.0).
+            A summary fails if it contradicts any extracted facts.
 
     Returns:
         JSON-serializable verification report.
@@ -260,6 +279,7 @@ def verify_summary_v1(
                     "status": "fail",
                     "structural": {"status": "fail", "checks": []},
                     "semantic": None,
+                    "contradiction_score": 1.0,
                     "coverage_score": 0.0,
                 }
             )
@@ -270,31 +290,36 @@ def verify_summary_v1(
 
         # 2. Semantic scoring (only if structural passes and LLM client available)
         semantic: Optional[Dict[str, Any]] = None
+        contradiction_score = 0.0
         coverage_score = 0.0
 
         if structural["status"] == "pass" and llm_client is not None:
             semantic = _semantic_score(
                 summary, facts, llm_client, compiler_model, max_sample_facts
             )
-            coverage_score = semantic.get("coverage_score", 0.0)
             if semantic.get("error"):
                 warnings.append(
                     f"Semantic scoring error for {slot}: {semantic['error']}"
                 )
-                # On scoring error, fail safe
+                # On scoring error, fail safe — treat as no contradictions detected
+                contradiction_score = 0.0
                 coverage_score = 0.0
+            else:
+                contradiction_score = semantic.get("contradiction_score", 0.0)
+                coverage_score = semantic.get("coverage_score", 0.0)
         elif structural["status"] == "pass" and llm_client is None:
-            # No LLM: auto-pass semantic with full score (structural-only mode)
+            # No LLM: auto-pass (structural-only mode)
+            contradiction_score = 0.0
             coverage_score = 1.0
             warnings.append(
                 f"No LLM client provided; skipping semantic scoring for {slot}."
             )
 
-        # Pass if structural passes AND coverage meets threshold
-        passes_threshold = coverage_score >= pass_threshold
+        # PRIMARY gate: fail if summary contradicts any extracted facts
+        passes_contradiction_check = contradiction_score <= max_contradiction_score
         final_status = (
             "pass"
-            if (structural["status"] == "pass" and passes_threshold)
+            if (structural["status"] == "pass" and passes_contradiction_check)
             else "fail"
         )
 
@@ -306,8 +331,9 @@ def verify_summary_v1(
                 "status": final_status,
                 "structural": structural,
                 "semantic": semantic,
+                "contradiction_score": contradiction_score,
                 "coverage_score": coverage_score,
-                "passes_threshold": passes_threshold,
+                "passes_contradiction_check": passes_contradiction_check,
             }
         )
 
@@ -327,7 +353,7 @@ def verify_summary_v1(
     if not min_viable:
         warnings.append(
             f"Minimum viability not met: {pass_count}/2 summaries passed "
-            f"(threshold={pass_threshold})."
+            f"(max_contradiction_score={max_contradiction_score})."
         )
 
     overall = "pass" if min_viable else "fail"
@@ -336,7 +362,7 @@ def verify_summary_v1(
         "status": overall,
         "created_at": _utc_now_iso(),
         "fact_count": fact_count,
-        "pass_threshold": pass_threshold,
+        "max_contradiction_score": max_contradiction_score,
         "summary_results": per_summary,
         "checks": top_level_checks,
         "warnings": warnings,

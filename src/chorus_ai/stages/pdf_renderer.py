@@ -500,15 +500,24 @@ def _audit_table_elements(audit: Dict[str, Any], s: Dict[str, ParagraphStyle]) -
         _row("Total Characters", f"{audit.get('total_chars', 0):,}"),
         _row("Facts Extracted", audit.get("fact_count", "")),
         _row("Fact Set ID", audit.get("fact_set_id", "")),
-        _row("Verification Status", verification.get("status", "")),
-        _row("Pass Threshold", verification.get("pass_threshold", "")),
+        _row("Verification Status", verification.get("status", "").upper()),
+        _row("Max Allowed Contradictions", verification.get("max_contradiction_score", 0.0)),
         _row("Retries Used", verification.get("retries_used", 0)),
     ]
+
     for score in verification.get("summary_scores", []):
         slot = score.get("model_slot", "?")
-        cov = score.get("coverage_score", "?")
-        vstatus = score.get("status", "?")
-        rows.append(_row(f"  {slot}", f"{cov}  [{vstatus}]"))
+        passed = score.get("passes_contradiction_check")
+        contradiction = score.get("contradiction_score")
+        coverage = score.get("coverage_score")
+        result = "PASS" if passed else "FAIL"
+        detail_parts = []
+        if contradiction is not None:
+            detail_parts.append(f"contradictions: {contradiction:.0%}")
+        if coverage is not None:
+            detail_parts.append(f"coverage: {coverage:.0%}")
+        detail = f"  ({',  '.join(detail_parts)})" if detail_parts else ""
+        rows.append(_row(f"  {slot}", f"{result}{detail}"))
 
     ctx = audit.get("contextual_analyses", [])
     rows.append(_row("Contextual Analyses", ", ".join(ctx) if ctx else "none"))

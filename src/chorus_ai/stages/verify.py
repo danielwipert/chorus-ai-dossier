@@ -73,6 +73,7 @@ def run_verify(run_dir: str) -> dict:
     config = load_run_config(run_root)
     verification_cfg = config.get("verification", {})
     pass_threshold = float(verification_cfg.get("pass_threshold", 0.75))
+    max_contradiction_score = float(verification_cfg.get("max_contradiction_score", 0.0))
     max_retries = int(verification_cfg.get("max_retries", 2))
     max_sample_facts = int(verification_cfg.get("max_sample_facts", 40))
     compiler_model = config.get("models", {}).get("compiler", "claude-sonnet-4-6")
@@ -103,6 +104,7 @@ def run_verify(run_dir: str) -> dict:
             llm_client=llm,
             compiler_model=compiler_model,
             pass_threshold=pass_threshold,
+            max_contradiction_score=max_contradiction_score,
             max_sample_facts=max_sample_facts,
         )
 
