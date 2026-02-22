@@ -98,16 +98,20 @@ State regression is not allowed. If a run fails, start a new run.
 ---
 
 ### Stage 4: Verification (Closed-Loop Core)
-**Input:** `FactList` + `[Summary_A, Summary_B, Summary_C]`  
-**Output:** `VerificationReport` with pass/fail per summary + `FactCoverageScore`  
-**Model Role:** Model 5 — higher-quality model (compiler/verifier)  
+**Input:** `FactList` + `[Summary_A, Summary_B, Summary_C]`
+**Output:** `VerificationReport` with pass/fail per summary + `contradiction_score` + `coverage_score`
+**Model Role:** Model 5 — higher-quality model (compiler/verifier)
 
 **Scoring Logic:**
-- Each summary scored against FactList for: coverage, absence of unsupported claims, alignment
-- Score threshold for pass: `>= 0.75` (configurable in `config.yaml`)
+- Each fact is classified as `aligned | absent | contradicted` against the summary
+- **PRIMARY metric:** `contradiction_score = contradicted_facts / total_facts`
+  - A summary **fails** if `contradiction_score > max_contradiction_score` (default `0.0` — zero tolerance)
+  - This is the hallucination gate: a summary that contradicts any extracted fact fails
+- **SECONDARY metric:** `coverage_score` recorded for audit trail only — does not gate pass/fail
+  - A tight summary that skips facts but contradicts none is acceptable
 
 **Pass/Retry Logic:**
-- **PASS:** At least 2 summaries score >= threshold → proceed to Stage 5
+- **PASS:** At least 2 summaries have `contradiction_score <= max_contradiction_score` → proceed to Stage 5
 - **RETRY:** Fewer than 2 pass → regenerate only the failed summaries, rerun verification
 - **FAIL:** Max retries reached without 2 passing → emit diagnostic, halt run
 
@@ -234,26 +238,39 @@ Model assignments are config-driven — swap models in `config.yaml` without tou
 
 ---
 
-## Configuration (`config.yaml`)
+## Configuration (`configs/v1.json`)
 
-```yaml
-verification:
-  pass_threshold: 0.75
-  max_retries: 2
-
-models:
-  summarizer_a: "claude-haiku-4-5-20251001"
-  summarizer_b: "gemini-1.5-flash"
-  summarizer_c: "llama-3-8b"
-  fact_finder: "claude-haiku-4-5-20251001"
-  compiler: "claude-sonnet-4-6"
-  contextualizer_a: "claude-sonnet-4-6"
-  contextualizer_b: "gemini-1.5-pro"
-
-output:
-  formats: ["json", "pdf"]
-  include_audit_trail: true
+```json
+{
+  "pipeline_version": "v1",
+  "models": {
+    "summarizer_a": "claude-haiku-4-5-20251001",
+    "summarizer_b": "Qwen/Qwen2.5-72B-Instruct",
+    "summarizer_c": "together:meta-llama/Llama-3.3-70B-Instruct-Turbo",
+    "fact_finder": "claude-haiku-4-5-20251001",
+    "compiler": "together:deepseek-ai/DeepSeek-V3",
+    "contextualizer_a": "Qwen/Qwen2.5-72B-Instruct"
+  },
+  "verification": {
+    "pass_threshold": 0.5,
+    "max_contradiction_score": 0.0,
+    "max_retries": 2,
+    "max_sample_facts": 40
+  },
+  "ingestion": {
+    "min_chars_per_page": 50
+  },
+  "extraction": {
+    "pages_per_chunk": 3
+  },
+  "output": {
+    "include_audit_trail": true
+  }
+}
 ```
+
+- `max_contradiction_score`: the primary verification gate. Default `0.0` = zero tolerance for contradictions. Can be relaxed slightly (e.g. `0.05`) if the verifier model is over-flagging borderline cases.
+- `pass_threshold`: retained for backwards compatibility, not used in pass/fail logic.
 
 ---
 
@@ -285,20 +302,17 @@ output:
 ## How to Run (Commands)
 
 ```bash
-# Install dependencies
-pip install -r requirements.txt
+# Install the package (editable mode)
+pip install -e .
 
 # Run the full pipeline on a PDF
-python run_dossier.py --input path/to/document.pdf
+chorus-ai path/to/document.pdf --config configs/v1.json
 
-# Run a specific stage only (for debugging)
-python run_dossier.py --input path/to/document.pdf --stage ingestion
+# Resume an existing run (replays only incomplete stages)
+chorus-ai path/to/document.pdf --config configs/v1.json --resume
 
-# Resume a run from a specific stage (uses existing artifacts)
-python run_dossier.py --resume runs/dossier_run_20250219_143022_abc123 --from-stage verification
-
-# List all runs
-python run_dossier.py --list-runs
+# Force re-run of already-completed stage outputs
+chorus-ai path/to/document.pdf --config configs/v1.json --force
 ```
 
 ---
@@ -307,30 +321,37 @@ python run_dossier.py --list-runs
 
 ```
 chorus-ai/
-├── CLAUDE.md                  ← you are here
-├── config.yaml                ← model assignments, thresholds
-├── requirements.txt
-├── run_dossier.py             ← main entry point / orchestrator
-├── pipeline/
-│   ├── __init__.py
-│   ├── orchestrator.py        ← state machine, stage routing
-│   ├── stage_01_ingestion.py
-│   ├── stage_02_extraction.py
-│   ├── stage_03_summarization.py
-│   ├── stage_04_verification.py
-│   ├── stage_05_contextual.py
-│   ├── stage_06_compilation.py
-│   └── stage_07_finalization.py
-├── models/
-│   ├── __init__.py
-│   └── model_client.py        ← unified LLM API wrapper
-├── artifacts/
-│   ├── __init__.py
-│   └── schemas.py             ← Pydantic schemas for all artifact types
-├── utils/
-│   ├── run_manager.py         ← run folder creation, manifest writing
-│   └── audit.py              ← audit trail management
-└── runs/                      ← auto-created, gitignored
+├── CLAUDE.md                        ← you are here
+├── pyproject.toml                   ← package definition, entry point (chorus-ai CLI)
+├── configs/
+│   └── v1.json                      ← model assignments, thresholds, retry limits
+└── src/chorus_ai/
+    ├── cli.py                       ← main entry point (chorus-ai command)
+    ├── core/
+    │   ├── config.py                ← config loading
+    │   ├── errors.py                ← StageFailure and other exceptions
+    │   └── verification/
+    │       └── verify_summary_v1.py ← contradiction scoring logic
+    ├── llm/
+    │   └── client.py                ← unified LLM API wrapper (Anthropic + Together)
+    ├── runs/
+    │   └── status.py                ← run state machine helpers
+    ├── stages/
+    │   ├── ingest.py                ← Stage 1
+    │   ├── extract.py               ← Stage 2
+    │   ├── summarize.py             ← Stage 3
+    │   ├── verify.py                ← Stage 4
+    │   ├── contextualize.py         ← Stage 5
+    │   ├── compile.py               ← Stage 6
+    │   ├── export.py                ← Stage 7
+    │   ├── pdf_renderer.py          ← PDF rendering (ReportLab)
+    │   └── prompts/                 ← one .txt per stage, not hardcoded in Python
+    │       ├── extract_system.txt
+    │       ├── summarize_system.txt
+    │       ├── verify_system.txt
+    │       ├── contextualize_system.txt
+    │       └── compile_system.txt
+    └── runs/                        ← auto-created, gitignored
 ```
 
 ---
@@ -351,10 +372,10 @@ chorus-ai/
 - [x] Stage 1: Ingestion — pdfplumber extraction, text density validation, page/paragraph segmentation
 - [x] Stage 2: Fact Extraction — LLM (haiku) with type classification, source locations, confidence scores
 - [x] Stage 3: Summarization — three independent LLM summaries (A, B, C) with deterministic IDs
-- [x] Stage 4: Verification + retry loop — structural + LLM semantic scoring (0.75 threshold), regenerates failed summaries
+- [x] Stage 4: Verification + retry loop — structural check + LLM contradiction scoring (primary gate: `contradiction_score <= max_contradiction_score`, default 0.0), coverage recorded as secondary metric, regenerates failed summaries on retry
 - [x] Stage 5: Contextual Analysis — two contextualizer models, non-fatal, notes gaps
 - [x] Stage 6: Compilation — LLM synthesis with convergence scoring and section lineage
-- [x] Stage 7: Finalization — all six required dossier sections + audit trail (PDF export deferred to V2)
+- [x] Stage 7: Finalization — all six required dossier sections + audit trail + PDF export (ReportLab, editorial monochrome design)
 - [x] Orchestrator / state machine — CONTEXTUALIZED state added between VERIFIED and COMPILED
 - [x] Run folder manager — 00_input/, 50_contextual/, 60_compilation/, 70_export/
 - [x] Audit trail — embedded in final dossier (source hash, fact count, verification scores, model participation)
