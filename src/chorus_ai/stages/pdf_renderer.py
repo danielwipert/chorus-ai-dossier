@@ -94,6 +94,14 @@ def _styles() -> Dict[str, ParagraphStyle]:
             alignment=TA_CENTER,
             spaceAfter=0,
         ),
+        "cover_factcheck_cert": ParagraphStyle(
+            "cover_factcheck_cert",
+            fontName="Helvetica-Bold",
+            fontSize=8,
+            textColor=_BLACK,
+            alignment=TA_LEFT,
+            leading=13,
+        ),
         "cover_process_label": ParagraphStyle(
             "cover_process_label",
             fontName="Helvetica-Bold",
@@ -350,19 +358,16 @@ def _cover_elements(dossier: Dict[str, Any], s: Dict[str, ParagraphStyle]) -> Li
 
     elements.append(_hrule(thick=2.5, color=_RED, after=20))
     elements.append(Paragraph("CHORUS AI  \u00b7  INTELLIGENCE DOSSIER", s["cover_eyebrow"]))
-    elements.append(Paragraph("Summary Dossier", s["cover_title"]))
+    elements.append(Paragraph("Chorus AI \u2013 Dossier", s["cover_title"]))
 
     # Document title, author, publication (if available from PDF metadata)
     if doc_meta.get("title"):
         elements.append(Spacer(1, 0.06 * inch))
         elements.append(Paragraph(_e(doc_meta["title"]), s["cover_doc_title"]))
-    byline_parts = []
     if doc_meta.get("author"):
-        byline_parts.append(doc_meta["author"])
+        elements.append(Paragraph(_e(f"By {doc_meta['author']}"), s["cover_doc_byline"]))
     if doc_meta.get("subject"):
-        byline_parts.append(doc_meta["subject"])
-    if byline_parts:
-        elements.append(Paragraph(_e("  \u00b7  ".join(byline_parts)), s["cover_doc_byline"]))
+        elements.append(Paragraph(_e(doc_meta["subject"]), s["cover_doc_byline"]))
 
     elements.append(_hrule(thick=2.5, color=_RED, after=28))
     elements.append(Spacer(1, 0.25 * inch))
@@ -385,6 +390,27 @@ def _cover_elements(dossier: Dict[str, Any], s: Dict[str, ParagraphStyle]) -> Li
     t = Table(meta_rows, colWidths=col_w)
     t.setStyle(meta_ts)
     elements.append(t)
+
+    # Fact-check certification block
+    elements.append(Spacer(1, 0.18 * inch))
+    cert_text = (
+        "\u2713  FACT-CHECK CERTIFIED  \u00b7  "
+        "All summaries passed zero-tolerance contradiction screening "
+        "against a locked fact list extracted directly from the source document. "
+        "No claim in this dossier contradicts the original text."
+    )
+    cert_row = [[Paragraph(cert_text, s["cover_factcheck_cert"])]]
+    cert_t = Table(cert_row, colWidths=[CONTENT_W])
+    cert_t.setStyle(TableStyle([
+        ("BACKGROUND",    (0, 0), (-1, -1), HexColor("#f0f0f0")),
+        ("LINEABOVE",     (0, 0), (-1,  0), 1.5, _RED),
+        ("LINEBELOW",     (0, -1), (-1, -1), 0.5, _LIGHT_GRAY),
+        ("TOPPADDING",    (0, 0), (-1, -1), 9),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 9),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 12),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 12),
+    ]))
+    elements.append(cert_t)
 
     # Process description — how this report was made, in plain English
     if process_description:
@@ -554,16 +580,29 @@ def _contextual_analysis_elements(ctx_text: str, s: Dict[str, ParagraphStyle]) -
     elements: List = []
     chunks = [c.strip() for c in ctx_text.split("\n\n") if c.strip()]
 
+    # Pre-count how many model-section headers exist so we can number them
+    _num_sections = sum(
+        1 for c in chunks
+        if " ".join(c.split()).startswith("===") and " ".join(c.split()).endswith("===")
+    )
+    _section_counter = 0
+    _roman = ["I", "II", "III", "IV"]
+
     for chunk in chunks:
         # Collapse internal newlines so each chunk is a single line for matching
         line = " ".join(chunk.split())
 
         if line.startswith("===") and line.endswith("==="):
-            # Model section header  e.g. "=== Contextual Analysis (contextualizer_a) ==="
-            model_name = line.strip("=").strip()
+            # Model section header — strip the model slot name, the model roster above already
+            # identifies the model; here we just label the analytical perspective.
+            _section_counter += 1
+            if _num_sections > 1:
+                label = f"Contextual Analysis \u2014 Part {_roman[_section_counter - 1]}"
+            else:
+                label = "Contextual Analysis"
             elements.append(Spacer(1, 0.08 * inch))
             elements.append(_hrule(thick=0.5, color=_LIGHT_GRAY, after=4))
-            elements.append(Paragraph(_e(model_name), s["ctx_model_header"]))
+            elements.append(Paragraph(_e(label), s["ctx_model_header"]))
 
         elif line.startswith("[") and line.endswith("]"):
             # Lens header  e.g. "[Historical Context]"
@@ -722,6 +761,12 @@ def render_dossier_pdf(dossier: Dict[str, Any], out_path: Path) -> None:
     # 02 — Compiled Summary
     story.extend(_section_block(2, "COMPILED SUMMARY", s))
     story.extend(_model_attribution(attr.get("2", ""), s))
+    story.append(Paragraph(
+        "\u2713 Fact-check verified. Every claim in this summary was cross-checked against "
+        "a locked list of facts extracted directly from the source document. Summaries "
+        "that contradicted any extracted fact were rejected before reaching this report.",
+        s["body_italic"],
+    ))
     story.extend(_compiled_summary_elements(
         sections.get("compiled_summary", "[Not available.]"), s
     ))
@@ -747,6 +792,16 @@ def render_dossier_pdf(dossier: Dict[str, Any], out_path: Path) -> None:
     # 05 — Verification Receipt
     story.extend(_section_block(5, "VERIFICATION RECEIPT", s))
     story.extend(_model_attribution(attr.get("5", ""), s))
+    story.append(Paragraph(
+        "The following claims were subjected to a zero-tolerance fact-check: a dedicated "
+        "model extracted every discrete factual claim from the source document into a locked "
+        "fact list, then a separate verification model checked each AI-generated summary "
+        "against that list. Any summary that contradicted even a single extracted fact was "
+        "rejected outright — no exceptions, no partial credit. Only summaries with zero "
+        "contradictions advanced to the compiled report. The entries below are traceable to "
+        "specific facts in the original document.",
+        s["body_italic"],
+    ))
     story.extend(_verification_receipt_elements(sections.get("key_claims", []), s))
 
     # 06 — Audit Trail

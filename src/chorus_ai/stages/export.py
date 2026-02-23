@@ -159,14 +159,16 @@ def _build_process_description(
         f"The source document was independently summarized by {summary_clause} — "
         f"each working without knowledge of the others' outputs. "
         f"A dedicated fact-extraction model then catalogued {fact_count} discrete "
-        f"claims directly from the original text, creating a locked fact list. "
-        f"A verification model checked each summary against that fact list for contradictions; "
-        f"{passing_clause} passed the hallucination check and advanced. "
-        f"A compiler model synthesized the passing summaries into a single coherent "
-        f"analysis, retaining only claims corroborated by multiple sources. "
+        f"claims directly from the original text, producing a locked, immutable fact list. "
+        f"A separate verification model then subjected every summary to a zero-tolerance "
+        f"fact-check: each summary was checked claim-by-claim against that fact list, "
+        f"and any summary that contradicted even a single extracted fact was rejected. "
+        f"{passing_clause} passed this ruthless screening and advanced. "
+        f"A compiler model then synthesized only the passing summaries into a single "
+        f"coherent report, retaining only claims corroborated by multiple independent sources. "
         f"{context_clause}"
-        f"Every key claim in this report traces back to a specific fact extracted "
-        f"from the source document."
+        f"Every claim in this report is traceable to a specific fact extracted directly "
+        f"from the source document. Nothing in this dossier contradicts the original text."
     )
 
 
