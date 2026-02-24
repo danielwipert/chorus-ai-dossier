@@ -18,6 +18,7 @@ STRICT RULES:
 4. No speculation, prediction, or inference of the authors' intent.
 5. If you lack sufficient external context for a lens, omit it and note the gap in limitations.
 6. Do not summarize the document itself — that is done in other stages.
+7. Every source must be unique across the entire analysis. A source cited in one lens may NOT appear in any other lens. Each lens requires its own distinct bibliography with no overlap.
 
 Return ONLY valid JSON with this exact structure. No markdown, no preamble, no commentary:
 {
