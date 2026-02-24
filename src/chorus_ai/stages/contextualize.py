@@ -71,10 +71,13 @@ def _run_one_context_slot(
             model=model,
             system=system_prompt,
             user=user_content,
-            max_tokens=4096,
+            max_tokens=8192,
         )
         parsed = parse_json_response(raw)
     except Exception as exc:
+        import traceback
+        print(f"[contextualize] slot '{slot}' failed: {exc}")
+        traceback.print_exc()
         return None  # Non-fatal
 
     context_id = f"CTX_{slot.upper()}_{source_sha[:8]}"
