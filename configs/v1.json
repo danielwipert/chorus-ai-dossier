@@ -2,11 +2,11 @@
   "pipeline_version": "v1",
   "models": {
     "summarizer_a": "claude-haiku-4-5-20251001",
-    "summarizer_b": "Qwen/Qwen2.5-72B-Instruct",
-    "summarizer_c": "together:meta-llama/Llama-3.3-70B-Instruct-Turbo",
+    "summarizer_b": "together:Qwen/Qwen3-235B-A22B-Instruct-2507-tput",
+    "summarizer_c": "together:meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8",
     "fact_finder": "claude-haiku-4-5-20251001",
-    "compiler": "together:deepseek-ai/DeepSeek-V3",
-    "contextualizer_a": "Qwen/Qwen2.5-72B-Instruct"
+    "compiler": "together:deepseek-ai/DeepSeek-V3.1",
+    "contextualizer_a": "together:meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8"
   },
   "verification": {
     "pass_threshold": 0.5,

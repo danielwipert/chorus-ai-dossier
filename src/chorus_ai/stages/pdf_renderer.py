@@ -357,7 +357,6 @@ def _cover_elements(dossier: Dict[str, Any], s: Dict[str, ParagraphStyle]) -> Li
     elements: List = [Spacer(1, 1.4 * inch)]
 
     elements.append(_hrule(thick=2.5, color=_RED, after=20))
-    elements.append(Paragraph("CHORUS AI  \u00b7  INTELLIGENCE DOSSIER", s["cover_eyebrow"]))
     elements.append(Paragraph("Chorus AI \u2013 Dossier", s["cover_title"]))
 
     # Document title, author, publication (if available from PDF metadata)

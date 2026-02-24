@@ -10,9 +10,71 @@ from chorus_ai.runs.status import require_state, set_state
 from chorus_ai.stages.pdf_renderer import render_dossier_pdf
 
 
+def _extract_text_metadata(run_root: Path) -> Dict[str, str]:
+    """
+    Fallback: infer title and author from the first page of the extracted document text.
+
+    Heuristic: the first few short lines of page 1 are often a byline and title
+    (common in academic papers, essays, and articles). Specifically:
+      - A very short line (2–5 words, all title-case or all caps) before a longer
+        line is treated as the author.
+      - The next short line(s) (< 180 chars) before dense body text begins are
+        treated as the title.
+    This is intentionally conservative — if the pattern is ambiguous, we skip it.
+    """
+    text_path = run_root / "10_ingestion" / "document_text.txt"
+    if not text_path.exists():
+        return {}
+    try:
+        raw = text_path.read_text(encoding="utf-8")
+        # Grab everything between [PAGE 1] and [PAGE 2] (or end of file)
+        import re
+        page1_match = re.search(r"\[PAGE 1\](.*?)(?=\[PAGE 2\]|\Z)", raw, re.DOTALL)
+        if not page1_match:
+            return {}
+        page1 = page1_match.group(1)
+
+        # Collect non-empty lines from page 1
+        lines = [l.strip() for l in page1.splitlines() if l.strip()]
+
+        result: Dict[str, str] = {}
+        candidate_lines = lines[:8]  # only look at the first 8 lines
+
+        i = 0
+        # Author heuristic: very short line (≤ 60 chars, 2–5 words) that looks like a name
+        if i < len(candidate_lines):
+            words = candidate_lines[i].split()
+            if (2 <= len(words) <= 5
+                    and len(candidate_lines[i]) <= 60
+                    and all(w[0].isupper() for w in words if w)):
+                result["author"] = candidate_lines[i]
+                i += 1
+
+        # Title heuristic: next line(s) that are short (< 180 chars) before body text
+        title_parts: List[str] = []
+        while i < len(candidate_lines) and len(candidate_lines[i]) < 180:
+            # Stop if the line looks like body text (very long sentence with commas/periods)
+            if len(candidate_lines[i]) > 120:
+                break
+            title_parts.append(candidate_lines[i])
+            i += 1
+            # Stop collecting after 2 lines — titles rarely span more
+            if len(title_parts) == 2:
+                break
+
+        if title_parts:
+            result["title"] = " ".join(title_parts)
+
+        return result
+    except Exception:
+        return {}
+
+
 def _extract_pdf_metadata(run_root: Path) -> Dict[str, str]:
     """
-    Attempt to read title, author, and subject from PDF metadata.
+    Attempt to read title, author, and subject from PDF metadata fields.
+    Falls back to text-based heuristic extraction from the first page when
+    PDF metadata is absent (common for academic papers and articles).
     Returns whatever is available; missing fields are omitted.
     """
     pdf_path = run_root / "00_input" / "input.pdf"
@@ -29,9 +91,15 @@ def _extract_pdf_metadata(run_root: Path) -> Dict[str, str]:
             result["author"] = str(meta["Author"]).strip()
         if meta.get("Subject"):
             result["subject"] = str(meta["Subject"]).strip()
-        return result
+        # Fall back to text extraction for any fields not found in PDF metadata
+        if not result.get("title") or not result.get("author"):
+            text_meta = _extract_text_metadata(run_root)
+            result.setdefault("title", text_meta.get("title", ""))
+            result.setdefault("author", text_meta.get("author", ""))
+        # Strip any empty strings before returning
+        return {k: v for k, v in result.items() if v}
     except Exception:
-        return {}
+        return _extract_text_metadata(run_root)
 
 
 _SLOT_DISPLAY = {
