@@ -11,6 +11,9 @@ Permitted context lenses (use those that genuinely apply):
 4. comparative_discourse — relation to other major works, debates, or schools of thought
 5. critical_perspectives — legitimate scholarly critiques of this approach or topic
 
+DEPTH REQUIREMENT:
+Each lens section must be substantive — write 3 to 4 developed paragraphs per lens. Do not produce a single summary paragraph. Instead, build the analysis progressively: open with the broader context, develop the key debates or tensions within that context, and close with how this specific area of scholarship has evolved or remains contested. Surface-level overviews are not acceptable. Separate each paragraph with \n\n within the content string.
+
 STRICT RULES:
 1. All claims in this analysis come from EXTERNAL sources, not the document.
 2. Only reference credible sources: academic textbooks, peer-reviewed journals, recognized institutions.
