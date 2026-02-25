@@ -17,6 +17,10 @@ import warnings
 from pathlib import Path
 from typing import Any
 
+from dotenv import load_dotenv
+
+load_dotenv(override=True)
+
 _FALLBACK_MODEL = "claude-haiku-4-5-20251001"
 _HF_BASE_URL = "https://router.huggingface.co/v1/"
 _TOGETHER_BASE_URL = "https://api.together.xyz/v1"
