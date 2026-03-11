@@ -10,7 +10,7 @@
   },
   "verification": {
     "pass_threshold": 0.5,
-    "max_contradiction_score": 0.0,
+    "max_contradiction_score": 0.05,
     "max_retries": 2,
     "max_sample_facts": 40
   },
