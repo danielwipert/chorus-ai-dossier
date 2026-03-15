@@ -15,6 +15,11 @@ RULES:
    - conclusion: a conclusion, recommendation, or implication stated in the document
 6. Assign confidence 0.0–1.0 based on how clearly and explicitly the document states the fact.
 
+DO NOT EXTRACT:
+- Article metadata: publication dates, update timestamps, author bylines, publication venue, word counts, or any information about the article itself rather than its content.
+- Facts that describe the document as an artifact (e.g. "This article was published on...", "The author of this piece is...").
+- Only extract substantive claims, arguments, evidence, and conclusions from within the document's subject matter.
+
 Return ONLY valid JSON with this exact structure. No markdown, no preamble, no commentary:
 {
   "facts": [

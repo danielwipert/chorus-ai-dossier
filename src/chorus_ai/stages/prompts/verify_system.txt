@@ -14,6 +14,14 @@ For each fact, classify it as one of:
 
 A fact is "contradicted" only when the summary says something that is factually incompatible with the fact — not merely absent or phrased differently.
 
+Contradiction requires direct logical incompatibility. Examples of what is NOT a contradiction:
+- Using a different but non-exclusive title for a person (e.g. "co-founder" does not contradict "CEO" — a person can be both)
+- Adding background context that explains how a state came to be (e.g. "Farquhar stepped down, leaving Cannon-Brookes as sole CEO" is consistent with "Cannon-Brookes is sole CEO")
+- Paraphrasing a claim with different words that preserve the same meaning
+- A summary that omits a detail but does not assert the opposite
+
+Only mark "contradicted" when the summary makes an assertion that cannot simultaneously be true with the fact.
+
 SECONDARY TASK — Unsupported claims:
 Identify substantive claims in the summary that are NOT backed by any fact in the list. Do not flag general connective phrases or reasonable inferences. Report at most 5 unsupported claims.
 
