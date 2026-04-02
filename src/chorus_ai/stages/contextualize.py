@@ -71,7 +71,7 @@ def _run_one_context_slot(
             model=model,
             system=system_prompt,
             user=user_content,
-            max_tokens=8192,
+            max_tokens=16384,
         )
         parsed = parse_json_response(raw)
     except Exception as exc:

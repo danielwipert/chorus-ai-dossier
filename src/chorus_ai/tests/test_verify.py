@@ -90,20 +90,23 @@ class TestVerifySummaryV1:
             assert r["coverage_score"] == 0.9  # from mock response
 
     def test_below_threshold_fails(self, monkeypatch):
+        # Summaries with a high contradiction_score should fail.
+        # contradiction_score is the primary gate; coverage_score is informational only.
         from chorus_ai.llm.client import LLMClient
-        low_score_response = json.dumps({
-            "total_facts": 2, "covered_facts": 1, "coverage_score": 0.5,
+        high_contradiction_response = json.dumps({
+            "total_facts": 2, "covered_facts": 1,
+            "contradiction_score": 0.8, "coverage_score": 0.5,
             "unsupported_claims": [], "fact_coverage": [],
         })
         monkeypatch.setattr(
-            LLMClient, "_call_anthropic", lambda self, **kw: low_score_response
+            LLMClient, "_call_anthropic", lambda self, **kw: high_contradiction_response
         )
         llm = LLMClient({})
         summaries = [_make_summary(slot=s) for s in
                      ["summarizer_a", "summarizer_b", "summarizer_c"]]
         report = verify_summary_v1(
             facts=SAMPLE_FACTS, summaries=summaries,
-            llm_client=llm, pass_threshold=0.75,
+            llm_client=llm, max_contradiction_score=0.0,
         )
         assert report["status"] == "fail"
 
@@ -160,18 +163,20 @@ class TestRunVerify:
 
         call_count = {"n": 0}
         passing_response = json.dumps({
-            "total_facts": 2, "covered_facts": 2, "coverage_score": 0.9,
+            "total_facts": 2, "covered_facts": 2,
+            "contradiction_score": 0.0, "coverage_score": 0.9,
             "unsupported_claims": [], "fact_coverage": [],
         })
         failing_response = json.dumps({
-            "total_facts": 2, "covered_facts": 0, "coverage_score": 0.1,
+            "total_facts": 2, "covered_facts": 0,
+            "contradiction_score": 1.0, "coverage_score": 0.1,
             "unsupported_claims": [], "fact_coverage": [],
         })
 
         def fake_call(self, *, model, system, user, max_tokens, temperature):
             call_count["n"] += 1
-            if "verification expert" in system.lower():
-                # First two verify calls fail, then pass after retry
+            if "hallucination-detection expert" in system.lower():
+                # First verify attempt (3 calls) fails; subsequent calls pass after retry
                 if call_count["n"] <= 3:
                     return failing_response
                 return passing_response

@@ -1,374 +1,191 @@
 """
-Chorus AI — Dossier Generator (Streamlit UI)
+Chorus AI — Dossier Web UI
 Run with: streamlit run app.py
 """
+from __future__ import annotations
 
 import json
-import threading
-import time
+import tempfile
 from pathlib import Path
 
 import streamlit as st
+from dotenv import load_dotenv
 
-# ── Constants ─────────────────────────────────────────────────────────────────
+load_dotenv()
 
-REPO_ROOT = Path(__file__).parent
-CONFIG_PATH = REPO_ROOT / "configs" / "v1.json"
-RUNS_DIR = REPO_ROOT / "runs"
-UPLOADS_DIR = REPO_ROOT / ".streamlit_uploads"
+from chorus_ai.core.config import load_and_canonicalize_config
+from chorus_ai.core.errors import ChorusFatalError
+from chorus_ai.core.hashing import sha256_file
+from chorus_ai.runs.layout import compute_run_id, create_run_folders
+from chorus_ai.stages.ingest import run_ingest
+from chorus_ai.stages.extract import run_extract
+from chorus_ai.stages.summarize import run_summarize
+from chorus_ai.stages.verify import run_verify
+from chorus_ai.stages.contextualize import run_contextualize
+from chorus_ai.stages.compile import run_compile
+from chorus_ai.stages.export import run_export
 
-STATE_ORDER = [
-    "INIT",
-    "INGESTED",
-    "EXTRACTED",
-    "SUMMARIZED",
-    "VERIFIED",
-    "CONTEXTUALIZED",
-    "COMPILED",
-    "FINALIZED",
-]
-STATE_INDEX = {s: i for i, s in enumerate(STATE_ORDER)}
+CONFIG_PATH = Path(__file__).parent / "configs" / "v1.json"
+RUNS_DIR = Path(__file__).parent / "runs"
 
-STAGE_LABELS = {
-    "INIT":           ("1/7", "Initializing"),
-    "INGESTED":       ("1/7", "Ingesting PDF"),
-    "EXTRACTED":      ("2/7", "Extracting Facts"),
-    "SUMMARIZED":     ("3/7", "Generating Summaries"),
-    "VERIFIED":       ("4/7", "Verifying Summaries"),
-    "CONTEXTUALIZED": ("5/7", "Contextual Analysis"),
-    "COMPILED":       ("6/7", "Compiling Report"),
-    "FINALIZED":      ("7/7", "Done"),
-}
+st.set_page_config(page_title="Chorus AI — Dossier", layout="centered")
+st.title("Chorus AI — Dossier")
+st.caption(
+    "Upload a PDF and generate a structured analytical report — "
+    "fact-checked, multi-model, grounded."
+)
 
-# ── Pipeline thread ───────────────────────────────────────────────────────────
+uploaded = st.file_uploader("Upload a PDF", type=["pdf"], label_visibility="collapsed")
 
-def _run_pipeline(pdf_path: Path, state: dict) -> None:
-    """
-    Runs the full 7-stage pipeline in a background thread.
-    Writes progress into `state` (a shared dict from st.session_state).
-    """
+if not uploaded:
+    st.info("Upload a PDF above to get started.")
+    st.stop()
+
+st.divider()
+
+if st.button("Generate Dossier", type="primary", use_container_width=True):
+    # Write the uploaded file to a temp location so the pipeline can hash + read it
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+        tmp.write(uploaded.read())
+        tmp_pdf = Path(tmp.name)
+
     try:
-        from dotenv import load_dotenv
-        load_dotenv(REPO_ROOT / ".env")
-
-        from chorus_ai.core.config import load_and_canonicalize_config
-        from chorus_ai.core.errors import ChorusFatalError
-        from chorus_ai.core.hashing import sha256_file
-        from chorus_ai.runs.layout import compute_run_id, create_run_folders
-        from chorus_ai.stages.ingest import run_ingest
-        from chorus_ai.stages.extract import run_extract
-        from chorus_ai.stages.summarize import run_summarize
-        from chorus_ai.stages.verify import run_verify
-        from chorus_ai.stages.contextualize import run_contextualize
-        from chorus_ai.stages.compile import run_compile
-        from chorus_ai.stages.export import run_export
-
         config = load_and_canonicalize_config(CONFIG_PATH)
-        run_id = compute_run_id(pdf_path, config)
-        run_root = RUNS_DIR / f"dossier_{run_id}"
+    except Exception as exc:
+        st.error(f"Could not load config: {exc}")
+        st.stop()
 
-        state["run_id"] = run_id
-        state["run_root"] = str(run_root)
+    run_id = compute_run_id(tmp_pdf, config)
+    run_root = RUNS_DIR / f"dossier_{run_id}"
 
-        if not run_root.exists():
-            run_root = create_run_folders(RUNS_DIR, run_id, config, pdf_path)
+    if not run_root.exists():
+        run_root = create_run_folders(RUNS_DIR, run_id, config, tmp_pdf)
 
-        source_sha = sha256_file(pdf_path)
+    source_sha = sha256_file(tmp_pdf)
 
-        # Stage 1 — Ingestion
-        state["current_stage"] = "INGESTED"
+    STAGES = [
+        ("Ingestion",           "Extracting and validating text from PDF"),
+        ("Extraction",          "Finding and cataloguing all factual claims"),
+        ("Summarization",       "Generating 3 independent model summaries"),
+        ("Verification",        "Checking summaries against the fact list"),
+        ("Contextual Analysis", "Adding external scholarly context"),
+        ("Compilation",         "Synthesising the final compiled report"),
+        ("Export",              "Rendering PDF dossier"),
+    ]
+
+    progress = st.progress(0, text="Starting pipeline…")
+    stage_slots = [st.empty() for _ in STAGES]
+    error_box = st.empty()
+
+    def mark(i: int, label: str, done: bool = False, err: bool = False) -> None:
+        icon = "✅" if done else ("❌" if err else "⏳")
+        stage_slots[i].markdown(f"{icon} **{STAGES[i][0]}** — {label}")
+
+    failed = False
+    result: dict = {}
+
+    try:
+        # Stage 1
+        mark(0, STAGES[0][1])
         run_ingest(run_root, source_sha)
-        state["state"] = "INGESTED"
+        mark(0, "done", done=True)
+        progress.progress(1 / 7, text="Ingestion complete")
 
-        # Stage 2 — Extraction
-        state["current_stage"] = "EXTRACTED"
+        # Stage 2
+        mark(1, STAGES[1][1])
         run_extract(run_root)
-        state["state"] = "EXTRACTED"
+        mark(1, "done", done=True)
+        progress.progress(2 / 7, text="Extraction complete")
 
-        # Stage 3 — Summarization
-        state["current_stage"] = "SUMMARIZED"
+        # Stage 3
+        mark(2, STAGES[2][1])
         run_summarize(str(run_root))
-        state["state"] = "SUMMARIZED"
+        mark(2, "done", done=True)
+        progress.progress(3 / 7, text="Summarization complete")
 
-        # Stage 4 — Verification
-        state["current_stage"] = "VERIFIED"
+        # Stage 4
+        mark(3, STAGES[3][1])
         verify_result = run_verify(str(run_root))
         if not verify_result.get("ok"):
             raise ChorusFatalError("VERIFY_FAILED", "Verification failed", verify_result)
-        state["state"] = "VERIFIED"
+        mark(3, "done", done=True)
+        progress.progress(4 / 7, text="Verification complete")
 
-        # Stage 5 — Contextual Analysis (non-fatal)
-        state["current_stage"] = "CONTEXTUALIZED"
+        # Stage 5 (non-fatal)
+        mark(4, STAGES[4][1])
         run_contextualize(run_root)
-        state["state"] = "CONTEXTUALIZED"
+        mark(4, "done", done=True)
+        progress.progress(5 / 7, text="Contextual analysis complete")
 
-        # Stage 6 — Compilation
-        state["current_stage"] = "COMPILED"
+        # Stage 6
+        mark(5, STAGES[5][1])
         compile_result = run_compile(str(run_root))
         if not compile_result.get("ok"):
-            raise ChorusFatalError("COMPILE_FAILED", "Compile failed", compile_result)
-        state["state"] = "COMPILED"
+            raise ChorusFatalError("COMPILE_FAILED", "Compilation failed", compile_result)
+        mark(5, "done", done=True)
+        progress.progress(6 / 7, text="Compilation complete")
 
-        # Stage 7 — Export
-        state["current_stage"] = "FINALIZED"
-        export_result = run_export(str(run_root))
-        if not export_result.get("ok"):
-            raise ChorusFatalError("EXPORT_FAILED", "Export failed", export_result)
-        state["state"] = "FINALIZED"
-        state["done"] = True
+        # Stage 7
+        mark(6, STAGES[6][1])
+        result = run_export(str(run_root))
+        if not result.get("ok"):
+            raise ChorusFatalError("EXPORT_FAILED", "Export failed", result)
+        mark(6, "done", done=True)
+        progress.progress(1.0, text="Done")
+
+    except ChorusFatalError as exc:
+        error_box.error(f"Pipeline failed: **{exc.code}** — {exc}")
+        failed = True
 
     except Exception as exc:
-        state["error"] = str(exc)
-        state["done"] = True
+        error_box.error(f"Unexpected error: {exc}")
+        failed = True
 
+    finally:
+        tmp_pdf.unlink(missing_ok=True)
 
-# ── UI helpers ────────────────────────────────────────────────────────────────
+    if not failed and result.get("ok"):
+        st.divider()
+        st.success("Dossier generated successfully.")
 
-def _render_progress(ps: dict) -> None:
-    current = ps.get("current_stage", "INIT")
-    idx = STATE_INDEX.get(current, 0)
-    total = len(STATE_ORDER) - 1  # INIT is not a pipeline stage
+        # Show executive overview
+        json_path = result.get("artifact")
+        if json_path and Path(json_path).exists():
+            dossier = json.loads(Path(json_path).read_text(encoding="utf-8"))
+            overview = dossier.get("executive_overview", "")
+            if overview:
+                st.subheader("Executive Overview")
+                st.write(overview)
 
-    step_label, stage_label = STAGE_LABELS.get(current, ("", current))
+            key_claims = dossier.get("key_claims", [])
+            if key_claims:
+                st.subheader("Key Claims")
+                for claim in key_claims[:5]:
+                    fact_ids = ", ".join(claim.get("fact_ids", []))
+                    st.markdown(
+                        f"- {claim.get('claim', '')} "
+                        f"{'`' + fact_ids + '`' if fact_ids else ''}"
+                    )
 
-    st.progress(idx / total)
-    st.caption(f"Stage {step_label} — {stage_label}")
-
-    # Checklist
-    completed = STATE_INDEX.get(ps.get("state", "INIT"), 0)
-    rows = []
-    for s in STATE_ORDER[1:]:
-        si = STATE_INDEX[s]
-        _, label = STAGE_LABELS[s]
-        if si < completed:
-            rows.append(f"- [x] {label}")
-        elif si == STATE_INDEX.get(current, 0):
-            rows.append(f"- [ ] **{label}** _(running...)_")
-        else:
-            rows.append(f"- [ ] {label}")
-    st.markdown("\n".join(rows))
-
-
-def _render_dossier(run_root: Path) -> None:
-    dossier_path = run_root / "70_export" / "final_dossier.json"
-    pdf_path = run_root / "70_export" / "final_dossier.pdf"
-
-    if not dossier_path.exists():
-        st.error("Dossier output not found.")
-        return
-
-    dossier = json.loads(dossier_path.read_text(encoding="utf-8"))
-    sections = dossier.get("sections", {})
-    warnings = dossier.get("warnings", [])
-
-    # Download
-    col_dl, col_id = st.columns([2, 5])
-    if pdf_path.exists():
-        with col_dl:
+        # Download button for PDF
+        pdf_path = result.get("pdf")
+        if pdf_path and Path(pdf_path).exists():
+            pdf_bytes = Path(pdf_path).read_bytes()
             st.download_button(
-                "Download PDF Dossier",
-                data=pdf_path.read_bytes(),
-                file_name="dossier.pdf",
+                label="Download Dossier PDF",
+                data=pdf_bytes,
+                file_name=f"dossier_{uploaded.name}",
                 mime="application/pdf",
-                type="primary",
                 use_container_width=True,
+                type="primary",
             )
-    with col_id:
-        st.caption(f"Run ID: `{dossier.get('dossier_id', '—')}`")
-
-    if warnings:
-        st.warning("Pipeline warnings: " + " | ".join(warnings))
-
-    st.divider()
-
-    # 1 — Executive Overview
-    st.subheader("Executive Overview")
-    st.write(sections.get("executive_overview", "—"))
-
-    # 2 — Key Claims
-    st.subheader("Key Claims")
-    key_claims = sections.get("key_claims", [])
-    if isinstance(key_claims, list):
-        for claim in key_claims:
-            if isinstance(claim, dict):
-                facts = ", ".join(claim.get("supporting_facts", []))
-                suffix = f"  *({facts})*" if facts else ""
-                st.markdown(f"- {claim.get('claim', '')}{suffix}")
-            else:
-                st.markdown(f"- {claim}")
-    elif key_claims:
-        st.write(key_claims)
-
-    # 3 — Compiled Summary
-    st.subheader("Compiled Summary")
-    st.write(sections.get("compiled_summary", "—"))
-
-    # 4 — Contextual Analysis
-    with st.expander("Contextual Analysis (External Sources)"):
-        ctx = sections.get("contextual_analysis", "—")
-        if isinstance(ctx, list):
-            for section in ctx:
-                if isinstance(section, dict):
-                    st.markdown(f"**{section.get('lens', '').replace('_', ' ').title()}**")
-                    st.write(section.get("content", ""))
-                    srcs = section.get("sources", [])
-                    if srcs:
-                        st.caption("Sources: " + " · ".join(srcs))
-                else:
-                    st.write(section)
-        elif isinstance(ctx, dict):
-            for lens, content in ctx.items():
-                st.markdown(f"**{lens.replace('_', ' ').title()}**")
-                st.write(content)
         else:
-            st.write(ctx)
-
-    # 5 — Risks & Limitations
-    with st.expander("Risks, Limitations & Warnings"):
-        st.write(sections.get("risks_and_limitations", "—"))
-
-    # 6 — Audit Trail
-    with st.expander("Audit Trail"):
-        audit = sections.get("audit_trail", {})
-        if isinstance(audit, dict):
-            vcol, fcol = st.columns(2)
-            with vcol:
-                verif = audit.get("verification", {})
-                st.metric("Verification Status", verif.get("status", "—").upper())
-                st.metric("Retries Used", verif.get("retries_used", 0))
-            with fcol:
-                st.metric("Facts Extracted", audit.get("fact_count", "—"))
-                scores = verif.get("summary_scores", [])
-                if scores:
-                    avg = sum(s.get("contradiction_score", 0) for s in scores) / len(scores)
-                    st.metric("Avg Contradiction Score", f"{avg:.3f}")
-            st.json(audit)
-        else:
-            st.json(audit)
-
-    # Model roster
-    roster = dossier.get("model_roster", [])
-    if roster:
-        with st.expander("Model Roster"):
-            for m in roster:
-                st.markdown(
-                    f"**{m.get('role', m.get('slot', '?'))}** — "
-                    f"`{m.get('model_id', '?')}` ({m.get('model_short', '')})"
+            st.warning("PDF rendering failed — download the JSON dossier instead.")
+            if json_path and Path(json_path).exists():
+                st.download_button(
+                    label="Download Dossier JSON",
+                    data=Path(json_path).read_bytes(),
+                    file_name=f"dossier_{uploaded.name.replace('.pdf', '.json')}",
+                    mime="application/json",
+                    use_container_width=True,
                 )
-
-
-def _render_sidebar() -> None:
-    with st.sidebar:
-        st.header("Configuration")
-        try:
-            cfg = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
-            models = cfg.get("models", {})
-            st.markdown("**Models**")
-            for slot, model in models.items():
-                label = slot.replace("_", " ").title()
-                short = model.split("/")[-1] if "/" in model else model
-                st.caption(f"{label}: `{short}`")
-
-            st.divider()
-            verif = cfg.get("verification", {})
-            st.markdown("**Verification**")
-            st.caption(f"Max contradiction: `{verif.get('max_contradiction_score', '?')}`")
-            st.caption(f"Max retries: `{verif.get('max_retries', '?')}`")
-        except Exception:
-            st.caption("Could not load config.")
-
-        # Show existing runs
-        existing = sorted(RUNS_DIR.glob("dossier_*"), reverse=True) if RUNS_DIR.exists() else []
-        if existing:
-            st.divider()
-            st.markdown("**Recent Runs**")
-            for r in existing[:5]:
-                status_f = r / "00_meta" / "status.json"
-                state = "?"
-                if status_f.exists():
-                    try:
-                        state = json.loads(status_f.read_text()).get("state", "?")
-                    except Exception:
-                        pass
-                icon = "✓" if state == "FINALIZED" else "…"
-                st.caption(f"{icon} `{r.name[-20:]}`")
-
-
-# ── App ───────────────────────────────────────────────────────────────────────
-
-st.set_page_config(
-    page_title="Chorus AI — Dossier",
-    page_icon="📄",
-    layout="wide",
-)
-
-_render_sidebar()
-
-st.title("Chorus AI — Dossier Generator")
-st.caption("Upload a PDF to produce a multi-model, fact-verified analytical report.")
-
-# Session state defaults
-if "ps" not in st.session_state:
-    st.session_state.ps = {}      # pipeline state dict shared with thread
-if "thread" not in st.session_state:
-    st.session_state.thread = None
-
-ps: dict = st.session_state.ps
-thread: threading.Thread | None = st.session_state.thread
-
-running = thread is not None and thread.is_alive()
-done = ps.get("done", False)
-error = ps.get("error")
-
-# ── Upload / start ──
-if not running and not done:
-    uploaded = st.file_uploader("Upload PDF", type=["pdf"])
-
-    if uploaded:
-        UPLOADS_DIR.mkdir(exist_ok=True)
-        pdf_path = UPLOADS_DIR / uploaded.name
-        pdf_path.write_bytes(uploaded.getvalue())
-
-        st.success(f"{uploaded.name} — {uploaded.size:,} bytes")
-
-        if st.button("Generate Dossier", type="primary"):
-            st.session_state.ps = {}
-            new_thread = threading.Thread(
-                target=_run_pipeline,
-                args=(pdf_path, st.session_state.ps),
-                daemon=True,
-            )
-            st.session_state.thread = new_thread
-            new_thread.start()
-            st.rerun()
-
-# ── Running: live progress ──
-elif running:
-    st.info("Pipeline running — this takes a few minutes.")
-    _render_progress(ps)
-    time.sleep(2)
-    st.rerun()
-
-# ── Error ──
-elif done and error:
-    st.error(f"Pipeline failed: {error}")
-    run_root_str = ps.get("run_root")
-    if run_root_str:
-        failure_f = Path(run_root_str) / "00_meta" / "failure.json"
-        if failure_f.exists():
-            with st.expander("Failure details"):
-                st.json(json.loads(failure_f.read_text(encoding="utf-8")))
-    if st.button("Start Over"):
-        st.session_state.ps = {}
-        st.session_state.thread = None
-        st.rerun()
-
-# ── Done ──
-elif done and not error:
-    run_root = Path(ps.get("run_root", ""))
-    _render_dossier(run_root)
-    st.divider()
-    if st.button("Process Another PDF"):
-        st.session_state.ps = {}
-        st.session_state.thread = None
-        st.rerun()

@@ -19,6 +19,7 @@ dependencies = [
   "python-dotenv>=1.0",
   "pdfplumber>=0.11",
   "reportlab>=4.0",
+  "streamlit>=1.35",
 ]
 
 [project.optional-dependencies]

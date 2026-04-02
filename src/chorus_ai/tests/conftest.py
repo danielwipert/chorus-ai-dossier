@@ -90,7 +90,7 @@ _LLM_RESPONSES: Dict[str, str] = {
         }
     ),
     "fact-reporter": SAMPLE_SUMMARY_TEXT,
-    "verification expert": json.dumps(
+    "hallucination-detection expert": json.dumps(
         {
             "total_facts": 2,
             "covered_facts": 2,

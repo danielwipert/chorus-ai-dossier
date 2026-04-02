@@ -13,7 +13,9 @@ runs/
 # Auto-generated package metadata
 src/*.egg-info/
 
-# Generated artifacts
+# Test PDFs and generated artifacts
+testing/
+.streamlit_uploads/
 sample_dossier.pdf
 
 # Claude Code local config
