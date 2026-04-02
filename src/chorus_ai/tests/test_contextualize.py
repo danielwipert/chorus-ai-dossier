@@ -1,4 +1,4 @@
-"""Tests for Stage 5 (Contextual Analysis) — non-fatal behavior, artifact writing."""
+"""Tests for Stage 5 (Contextual Analysis) — artifact writing, retry, and fatal-on-failure behavior."""
 import json
 
 import pytest
@@ -50,27 +50,38 @@ class TestRunContextualize:
         status = json.loads((run_root / "00_meta" / "status.json").read_text())
         assert len(status["contextual_analyses"]) > 0
 
-    def test_nonfatal_on_llm_failure(self, tmp_path, monkeypatch):
-        """If the contextualizer model fails, stage still returns ok=True."""
+    def test_fatal_on_llm_failure(self, tmp_path, monkeypatch):
+        """If all retry attempts fail, stage raises ChorusFatalError."""
+        from chorus_ai.core.errors import ChorusFatalError
         monkeypatch.setattr(
             LLMClient, "_call_anthropic",
             lambda self, **kw: (_ for _ in ()).throw(RuntimeError("API down"))
         )
+        run_root = make_run_dir(tmp_path)
+        advance_to_verified(run_root)
+        with pytest.raises(ChorusFatalError, match="CONTEXT_FAILED"):
+            run_contextualize(run_root)
+
+    def test_retries_on_parse_failure(self, tmp_path, monkeypatch):
+        """On JSON parse failure, stage retries and succeeds on a later attempt."""
+        call_count = {"n": 0}
+        good_response = json.dumps({
+            "sections": [{"lens": "historical_context", "content": "Context.", "sources": []}],
+            "limitations": "",
+            "warnings": [],
+        })
+
+        def fake_call(self, **kw):
+            call_count["n"] += 1
+            if call_count["n"] < 3:
+                return "not valid json"
+            return good_response
+
+        monkeypatch.setattr(LLMClient, "_call_anthropic", fake_call)
         run_root = make_run_dir(tmp_path)
         advance_to_verified(run_root)
         result = run_contextualize(run_root)
 
         assert result["ok"] is True
-        assert len(result["warnings"]) > 0
-
-    def test_state_advances_even_on_llm_failure(self, tmp_path, monkeypatch):
-        monkeypatch.setattr(
-            LLMClient, "_call_anthropic",
-            lambda self, **kw: (_ for _ in ()).throw(RuntimeError("API down"))
-        )
-        run_root = make_run_dir(tmp_path)
-        advance_to_verified(run_root)
-        run_contextualize(run_root)
-
-        status = json.loads((run_root / "00_meta" / "status.json").read_text())
-        assert status["state"] == "CONTEXTUALIZED"
+        assert (run_root / "50_contextual" / "contextual_a.json").exists()
+        assert call_count["n"] == 3

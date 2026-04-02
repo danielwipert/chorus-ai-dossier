@@ -111,9 +111,11 @@ if st.button("Generate Dossier", type="primary", use_container_width=True):
         mark(3, "done", done=True)
         progress.progress(4 / 7, text="Verification complete")
 
-        # Stage 5 (non-fatal)
+        # Stage 5
         mark(4, STAGES[4][1])
-        run_contextualize(run_root)
+        ctx_result = run_contextualize(run_root)
+        if not ctx_result.get("ok"):
+            raise ChorusFatalError("CONTEXT_FAILED", "Contextual analysis failed", ctx_result)
         mark(4, "done", done=True)
         progress.progress(5 / 7, text="Contextual analysis complete")
 

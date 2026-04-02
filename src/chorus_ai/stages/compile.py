@@ -147,6 +147,7 @@ def run_compile(run_dir: str) -> dict:
             system=system_prompt,
             user=user_content,
             max_tokens=8192,
+            json_mode=True,
         )
         parsed = parse_json_response(raw)
     except Exception as exc:

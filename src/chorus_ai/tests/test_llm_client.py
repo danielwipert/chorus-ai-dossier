@@ -66,7 +66,7 @@ class TestHuggingFaceRouting:
     def test_hf_model_routes_to_huggingface(self, monkeypatch):
         called = {}
 
-        def fake_hf(self, *, model, system, user, max_tokens, temperature):
+        def fake_hf(self, *, model, system, user, max_tokens, temperature, json_mode=False):
             called["model"] = model
             return "hf response"
 
@@ -82,7 +82,7 @@ class TestHuggingFaceRouting:
     def test_qwen_model_routes_to_huggingface(self, monkeypatch):
         called = {}
 
-        def fake_hf(self, *, model, system, user, max_tokens, temperature):
+        def fake_hf(self, *, model, system, user, max_tokens, temperature, json_mode=False):
             called["model"] = model
             return "ok"
 
@@ -94,7 +94,7 @@ class TestHuggingFaceRouting:
     def test_llama_70b_routes_to_huggingface(self, monkeypatch):
         called = {}
 
-        def fake_hf(self, *, model, system, user, max_tokens, temperature):
+        def fake_hf(self, *, model, system, user, max_tokens, temperature, json_mode=False):
             called["model"] = model
             return "ok"
 
@@ -119,7 +119,7 @@ class TestTogetherRouting:
     def test_together_prefix_routes_to_together(self, monkeypatch):
         called = {}
 
-        def fake_together(self, *, model, system, user, max_tokens, temperature):
+        def fake_together(self, *, model, system, user, max_tokens, temperature, json_mode=False):
             called["model"] = model
             return "together response"
 

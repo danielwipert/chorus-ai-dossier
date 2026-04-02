@@ -199,8 +199,15 @@ class LLMClient:
         user: str,
         max_tokens: int = 4096,
         temperature: float = 0.0,
+        json_mode: bool = False,
     ) -> str:
-        """Route to the correct provider based on model name and return response text."""
+        """Route to the correct provider based on model name and return response text.
+
+        Set json_mode=True for calls that expect a JSON response. This passes
+        response_format={"type": "json_object"} to Together/HuggingFace, which
+        hard-constrains the model output to valid JSON and prevents malformed
+        responses (e.g. unquoted string values) that break parse_json_response.
+        """
         if _is_anthropic(model):
             return self._call_anthropic(
                 model=model,
@@ -217,6 +224,7 @@ class LLMClient:
                 user=user,
                 max_tokens=max_tokens,
                 temperature=temperature,
+                json_mode=json_mode,
             )
 
         if _is_huggingface(model):
@@ -226,6 +234,7 @@ class LLMClient:
                 user=user,
                 max_tokens=max_tokens,
                 temperature=temperature,
+                json_mode=json_mode,
             )
 
         # Unknown model — fall back to haiku with a warning
@@ -285,6 +294,7 @@ class LLMClient:
         user: str,
         max_tokens: int,
         temperature: float,
+        json_mode: bool = False,
     ) -> str:
         try:
             from openai import OpenAI
@@ -300,7 +310,7 @@ class LLMClient:
         client = OpenAI(base_url=_HF_BASE_URL, api_key=api_key)
 
         def _call() -> str:
-            response = client.chat.completions.create(
+            kwargs: dict = dict(
                 model=model,
                 messages=[
                     {"role": "system", "content": system},
@@ -309,6 +319,9 @@ class LLMClient:
                 max_tokens=max_tokens,
                 temperature=temperature,
             )
+            if json_mode:
+                kwargs["response_format"] = {"type": "json_object"}
+            response = client.chat.completions.create(**kwargs)
             content = response.choices[0].message.content
             if content is None:
                 raise RuntimeError(f"HuggingFace model '{model}' returned an empty response.")
@@ -324,6 +337,7 @@ class LLMClient:
         user: str,
         max_tokens: int,
         temperature: float,
+        json_mode: bool = False,
     ) -> str:
         try:
             from openai import OpenAI
@@ -342,7 +356,7 @@ class LLMClient:
         client = OpenAI(base_url=_TOGETHER_BASE_URL, api_key=api_key)
 
         def _call() -> str:
-            response = client.chat.completions.create(
+            kwargs: dict = dict(
                 model=model_id,
                 messages=[
                     {"role": "system", "content": system},
@@ -351,6 +365,9 @@ class LLMClient:
                 max_tokens=max_tokens,
                 temperature=temperature,
             )
+            if json_mode:
+                kwargs["response_format"] = {"type": "json_object"}
+            response = client.chat.completions.create(**kwargs)
             content = response.choices[0].message.content
             if content is None:
                 raise RuntimeError(f"Together AI model '{model_id}' returned an empty response.")

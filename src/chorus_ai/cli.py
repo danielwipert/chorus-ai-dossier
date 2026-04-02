@@ -142,10 +142,13 @@ def main(argv=None) -> int:
                 )
             current_state = "VERIFIED"
 
-        # --- Stage 5: Contextual Analysis (non-fatal) ---
+        # --- Stage 5: Contextual Analysis ---
         if _should_run_stage(args.resume, current_state, "CONTEXTUALIZED"):
             ctx_result = run_contextualize(run_root)
-            # Non-fatal: always advance even if context partially failed
+            if not ctx_result.get("ok"):
+                raise ChorusFatalError(
+                    "CONTEXT_FAILED", "Contextual analysis stage failed", ctx_result
+                )
             if ctx_result.get("warnings"):
                 print(
                     json.dumps(

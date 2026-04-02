@@ -51,11 +51,11 @@ def _run_one_context_slot(
     config: Dict[str, Any],
     source_sha: str,
     passing_summaries: List[Dict[str, Any]],
+    max_retries: int = 2,
 ) -> Optional[str]:
     """
     Generate contextual analysis for one model slot.
-    Returns the relative path to the written artifact, or None on failure.
-    Failure is NON-FATAL per CLAUDE.md.
+    Returns the relative path to the written artifact, or None if all attempts fail.
     """
     model = config.get("models", {}).get(slot, "claude-sonnet-4-6")
     out_dir = run_root / "50_contextual"
@@ -66,19 +66,25 @@ def _run_one_context_slot(
     system_prompt = load_prompt("contextualize_system")
     user_content = _build_user_prompt(passing_summaries)
 
-    try:
-        raw = llm.complete(
-            model=model,
-            system=system_prompt,
-            user=user_content,
-            max_tokens=16384,
-        )
-        parsed = parse_json_response(raw)
-    except Exception as exc:
-        import traceback
-        print(f"[contextualize] slot '{slot}' failed: {exc}")
-        traceback.print_exc()
-        return None  # Non-fatal
+    last_exc: Optional[Exception] = None
+    for attempt in range(max_retries + 1):
+        try:
+            raw = llm.complete(
+                model=model,
+                system=system_prompt,
+                user=user_content,
+                max_tokens=16384,
+                json_mode=True,
+            )
+            parsed = parse_json_response(raw)
+            last_exc = None
+            break
+        except Exception as exc:
+            last_exc = exc
+            print(f"[contextualize] slot '{slot}' attempt {attempt + 1}/{max_retries + 1} failed: {exc}")
+
+    if last_exc is not None:
+        return None
 
     context_id = f"CTX_{slot.upper()}_{source_sha[:8]}"
     artifact: Dict[str, Any] = {
@@ -174,9 +180,11 @@ def run_contextualize(run_root: Path) -> dict:
             )
 
     if not written_paths:
-        warnings.append(
-            "All contextual analysis models failed. "
-            "Proceeding without external context (noted in final dossier)."
+        raise ChorusFatalError(
+            "CONTEXT_FAILED",
+            "Contextual analysis failed on all slots after retries. "
+            "Cannot produce a complete dossier without external context.",
+            {"slots_attempted": _CONTEXT_SLOTS, "warnings": warnings},
         )
 
     # Update status

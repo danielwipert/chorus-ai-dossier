@@ -108,6 +108,7 @@ def _extract_facts_from_chunk(
             system=system_prompt,
             user=f"Extract all facts from the following document:\n\n{chunk_text}",
             max_tokens=8192,
+            json_mode=True,
         )
     except Exception as exc:
         raise ChorusFatalError(
