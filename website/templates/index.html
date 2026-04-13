@@ -38,7 +38,7 @@
 {% block nav %}
 <nav>
   <div class="nav-inner">
-    <span class="nav-logo"><span>//</span> CHORUS<span>.</span>AI</span>
+    <span class="nav-logo"><span>{{ site_name }}</span></span>
     <ul class="nav-links">
       {% for link in nav_links %}
       <li><a href="#{{ link.anchor }}">{{ link.label }}</a></li>
@@ -251,8 +251,8 @@
   <div class="container">
     <div class="footer-inner">
       <div class="footer-logo">
-        <strong>Chorus AI / Dossier V1</strong><br>
-        A closed-loop, multi-model document intelligence system.
+        <strong>Dossier by Chorus AI Systems</strong><br>
+        A closed-loop, multi-model document intelligence pipeline.
       </div>
       <ul class="footer-links">
         <li><a href="{{ github_url }}" target="_blank" rel="noopener">GitHub</a></li>
