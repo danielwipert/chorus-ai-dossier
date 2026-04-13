@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="A closed-loop, multi-model document intelligence pipeline. Extract facts, generate independent summaries, verify against a locked fact list, and produce a grounded analytical dossier." />
+  <title>Chorus AI — Dossier V1</title>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="static/css/style.css" />
+</head>
+<body>
+
+<nav>
+  <div class="nav-inner">
+    <span class="nav-logo"><span>//</span> CHORUS<span>.</span>AI</span>
+    <ul class="nav-links">
+      <li><a href="#what">What it is</a></li>
+      <li><a href="#principles">Principles</a></li>
+      <li><a href="#pipeline">Pipeline</a></li>
+      <li><a href="#verification">Verification</a></li>
+      <li><a href="#architecture">Architecture</a></li>
+      <li><a href="#stack">Stack</a></li>
+    </ul>
+  </div>
+</nav>
+
+  <main>
+
+<!-- ── Hero ─────────────────────────────────────────────── -->
+<section class="hero" id="overview">
+  <div class="container">
+    <div class="hero-tag">Open Source Project · Dossier V1</div>
+    <h1>Multi-model document<br><em>intelligence</em>, grounded in fact.</h1>
+    <p class="hero-sub">Chorus AI is a closed-loop pipeline that extracts atomic facts from a PDF, generates three independent summaries across different model architectures, then verifies every summary against a locked fact list before producing a traceable analytical dossier.</p>
+    <div class="hero-cta">
+      <a href="#pipeline" class="btn btn-primary">Explore the Pipeline</a>
+      <a href="https://github.com/danielwipert/chorusai" class="btn btn-secondary" target="_blank" rel="noopener">View on GitHub</a>
+    </div>
+
+    <div class="hero-stats">
+      <div class="hero-stat">
+        <div class="hero-stat-value">7</div>
+        <div class="hero-stat-label">Pipeline stages</div>
+      </div>
+      <div class="hero-stat">
+        <div class="hero-stat-value">3×</div>
+        <div class="hero-stat-label">Independent summaries</div>
+      </div>
+      <div class="hero-stat">
+        <div class="hero-stat-value">0.0</div>
+        <div class="hero-stat-label">Default contradiction tolerance</div>
+      </div>
+      <div class="hero-stat">
+        <div class="hero-stat-value">100%</div>
+        <div class="hero-stat-label">Outputs trace to source facts</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── What It Is ────────────────────────────────────────── -->
+<section id="what">
+  <div class="container">
+    <div class="section-label">01 — What it is</div>
+    <h2 class="section-title">What is Chorus AI?</h2>
+    <p class="section-intro">Chorus AI is not a chatbot, agent, or general-purpose LLM wrapper. It is a deterministic document intelligence pipeline with strict contracts between stages — designed to produce analytical reports that are grounded, verifiable, and auditable.</p>
+
+    <div class="what-grid">
+      <div class="what-cell">
+        <div class="what-cell-label">The problem</div>
+        <h3>LLMs hallucinate. Single-model outputs are unverified.</h3>
+        <p>A single frontier model summarising a complex document will confidently assert things not in the source. There is no internal check, no cross-validation, no audit trail.</p>
+      </div>
+      <div class="what-cell">
+        <div class="what-cell-label">The solution</div>
+        <h3>Three summaries, one fact list, a closed verification loop.</h3>
+        <p>Chorus extracts atomic facts first, then generates summaries independently across multiple model families. Each summary is verified against the locked fact list — any contradiction fails the summary and triggers a regeneration.</p>
+      </div>
+      <div class="what-cell">
+        <div class="what-cell-label">The output</div>
+        <h3>A structured dossier with a full audit trail.</h3>
+        <p>The final dossier contains an executive overview, key claims with fact IDs, compiled synthesis, external context, risks, and a complete audit trail — every claim traces to a source span.</p>
+      </div>
+      <div class="what-cell">
+        <div class="what-cell-label">Design philosophy</div>
+        <h3>Think CIA intelligence brief meets New Yorker book review.</h3>
+        <p>Grounded facts. Traceable claims. Explicitly labeled uncertainty. No speculation passed off as analysis. If confidence cannot be achieved, the pipeline halts visibly — not silently.</p>
+      </div>
+    </div>
+
+    <div class="callout">
+      <p><strong>Hard guarantee:</strong> The FactList is locked after extraction. No downstream stage can modify it. Summaries and analysis must conform to the facts — not the other way around.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── Design Principles ─────────────────────────────────── -->
+<section id="principles">
+  <div class="container">
+    <div class="section-label">02 — Design theory</div>
+    <h2 class="section-title">Seven non-negotiable design rules.</h2>
+    <p class="section-intro">These govern every implementation decision. They are constraints, not guidelines — a stage that violates them is wrong by definition.</p>
+
+    <div class="principles-grid">
+      <div class="principle-card">
+        <div class="principle-accent"></div>
+        <div class="principle-num">Rule 01</div>
+        <div class="principle-name">Determinism</div>
+        <p class="principle-desc">Same input + same config = same output. Temperature is zero across all models. No random seeds, no non-deterministic branches.</p>
+      </div>
+      <div class="principle-card">
+        <div class="principle-accent"></div>
+        <div class="principle-num">Rule 02</div>
+        <div class="principle-name">Grounding First</div>
+        <p class="principle-desc">No summary, analysis, or narrative exists without being grounded in extracted facts. External context is allowed exactly one designated section.</p>
+      </div>
+      <div class="principle-card">
+        <div class="principle-accent"></div>
+        <div class="principle-num">Rule 03</div>
+        <div class="principle-name">Fail-Closed</div>
+        <p class="principle-desc">Any broken stage gate halts the entire run. There is no silent degradation. A partial dossier is not a dossier.</p>
+      </div>
+      <div class="principle-card">
+        <div class="principle-accent"></div>
+        <div class="principle-num">Rule 04</div>
+        <div class="principle-name">Traceability</div>
+        <p class="principle-desc">Every output traces back to source spans in the original document. Every key claim references a Fact ID.</p>
+      </div>
+      <div class="principle-card">
+        <div class="principle-accent"></div>
+        <div class="principle-num">Rule 05</div>
+        <div class="principle-name">Separation of Concerns</div>
+        <p class="principle-desc">Facts, summaries, external context, and opinion are never mixed. Each lives in an explicitly typed artifact that cannot be mutated after creation.</p>
+      </div>
+      <div class="principle-card">
+        <div class="principle-accent"></div>
+        <div class="principle-num">Rule 06</div>
+        <div class="principle-name">Auditability</div>
+        <p class="principle-desc">Every decision is inspectable after the fact. The audit trail records model participation, contradiction scores, coverage scores, and which summaries contributed to each section.</p>
+      </div>
+      <div class="principle-card">
+        <div class="principle-accent"></div>
+        <div class="principle-num">Rule 07</div>
+        <div class="principle-name">No Agent Autonomy</div>
+        <p class="principle-desc">No background retries beyond configured limits, no self-directing behavior, no tool-calling loops. V1 is a pipeline, not an agent.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Pipeline ──────────────────────────────────────────── -->
+<section id="pipeline">
+  <div class="container">
+    <div class="section-label">03 — The pipeline</div>
+    <h2 class="section-title">The seven-stage pipeline.</h2>
+    <p class="section-intro">Each stage consumes explicit input artifacts, produces explicit output artifacts, and either succeeds or fails — nothing in between. State regression is not allowed.</p>
+
+    <div class="pipeline-flow">
+        <div class="pipeline-stage">
+  <div class="pipeline-stage-left">
+    <div class="pipeline-num">01</div>
+    <div class="pipeline-state">→ INGESTED</div>
+    <div class="pipeline-name">Ingestion</div>
+  </div>
+  <div class="pipeline-stage-right">
+    <p>Extracts raw text from the PDF, normalises formatting, segments into pages and paragraphs, indexes positions, and hashes the source file for immutability.</p>
+    <div class="pipeline-io">
+      <div class="pipeline-io-item">
+        <span class="pipeline-io-label">Input</span>
+        <span class="pipeline-io-value">PDF file</span>
+      </div>
+      <div class="pipeline-io-item">
+        <span class="pipeline-io-label">Output</span>
+        <span class="pipeline-io-value">IngestionRecord</span>
+      </div>
+      <div class="pipeline-io-item" style="max-width: 42ch;">
+        <span class="pipeline-io-label">Hard rule</span>
+        <span class="pipeline-io-value" style="color: var(--accent);">Image-only PDFs are rejected immediately. No partial processing.</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+        <div class="pipeline-connector"><span class="pipeline-arrow">↓</span></div>
+        <div class="pipeline-stage">
+  <div class="pipeline-stage-left">
+    <div class="pipeline-num">02</div>
+    <div class="pipeline-state">→ EXTRACTED</div>
+    <div class="pipeline-name">Extraction (Fact Finder)</div>
+  </div>
+  <div class="pipeline-stage-right">
+    <p>Uses a cheap extractive model to pull atomic, document-grounded facts. No paraphrasing, no interpretation, no synthesis. Every fact references a source page and paragraph.</p>
+    <div class="pipeline-io">
+      <div class="pipeline-io-item">
+        <span class="pipeline-io-label">Input</span>
+        <span class="pipeline-io-value">IngestionRecord</span>
+      </div>
+      <div class="pipeline-io-item">
+        <span class="pipeline-io-label">Output</span>
+        <span class="pipeline-io-value">FactList</span>
+      </div>
+      <div class="pipeline-io-item">
+        <span class="pipeline-io-label">Model role</span>
+        <span class="pipeline-io-value">Model 4 — cheap, extractive-only</span>
+      </div>
+      <div class="pipeline-io-item" style="max-width: 42ch;">
+        <span class="pipeline-io-label">Hard rule</span>
+        <span class="pipeline-io-value" style="color: var(--accent);">FactList is locked after this stage. No downstream stage may modify it.</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+        <div class="pipeline-connector"><span class="pipeline-arrow">↓</span></div>
+        <div class="pipeline-stage">
+  <div class="pipeline-stage-left">
+    <div class="pipeline-num">03</div>
+    <div class="pipeline-state">→ SUMMARIZED</div>
+    <div class="pipeline-name">Summarization</div>
+  </div>
+  <div class="pipeline-stage-right">
+    <p>Three independent models from different vendors and architectures each summarise the document. They do not see each other&#39;s outputs. Diversity of architecture reduces correlated failure modes.</p>
+    <div class="pipeline-io">
+      <div class="pipeline-io-item">
+        <span class="pipeline-io-label">Input</span>
+        <span class="pipeline-io-value">IngestionRecord</span>
+      </div>
+      <div class="pipeline-io-item">
+        <span class="pipeline-io-label">Output</span>
+        <span class="pipeline-io-value">Summary_A, Summary_B, Summary_C</span>
+      </div>
+      <div class="pipeline-io-item">
+        <span class="pipeline-io-label">Model role</span>
+        <span class="pipeline-io-value">Models 1, 2, 3 — different vendors / architectures</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+        <div class="pipeline-connector"><span class="pipeline-arrow">↓</span></div>
+        <div class="pipeline-stage">
+  <div class="pipeline-stage-left">
+    <div class="pipeline-num">04</div>
+    <div class="pipeline-state">→ VERIFIED</div>
+    <div class="pipeline-name">Verification</div>
+  </div>
+  <div class="pipeline-stage-right">
+    <p>Each summary is scored against every fact in the FactList. The primary metric is contradiction_score. Failed summaries are regenerated; the FactList never changes.</p>
+    <div class="pipeline-io">
+      <div class="pipeline-io-item">
+        <span class="pipeline-io-label">Input</span>
+        <span class="pipeline-io-value">FactList + [Summary_A, Summary_B, Summary_C]</span>
+      </div>
+      <div class="pipeline-io-item">
+        <span class="pipeline-io-label">Output</span>
+        <span class="pipeline-io-value">VerificationReport</span>
+      </div>
+      <div class="pipeline-io-item">
+        <span class="pipeline-io-label">Model role</span>
+        <span class="pipeline-io-value">Model 5 — higher-quality verifier</span>
+      </div>
+      <div class="pipeline-io-item" style="max-width: 42ch;">
+        <span class="pipeline-io-label">Hard rule</span>
+        <span class="pipeline-io-value" style="color: var(--accent);">&lt; 2 summaries passing after max retries → halt run.</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+        <div class="pipeline-connector"><span class="pipeline-arrow">↓</span></div>
+        <div class="pipeline-stage">
+  <div class="pipeline-stage-left">
+    <div class="pipeline-num">05</div>
+    <div class="pipeline-state">→ CONTEXTUALIZED</div>
+    <div class="pipeline-name">Contextual Analysis</div>
+  </div>
+  <div class="pipeline-stage-right">
+    <p>Two contextualizer models enrich the verified summaries with historical, disciplinary, methodological, and comparative context. All external claims must be explicitly cited.</p>
+    <div class="pipeline-io">
+      <div class="pipeline-io-item">
+        <span class="pipeline-io-label">Input</span>
+        <span class="pipeline-io-value">Verified summaries</span>
+      </div>
+      <div class="pipeline-io-item">
+        <span class="pipeline-io-label">Output</span>
+        <span class="pipeline-io-value">ContextualAnalysis_A, ContextualAnalysis_B</span>
+      </div>
+      <div class="pipeline-io-item">
+        <span class="pipeline-io-label">Model role</span>
+        <span class="pipeline-io-value">Models 6, 7 — contextualizer models</span>
+      </div>
+      <div class="pipeline-io-item" style="max-width: 42ch;">
+        <span class="pipeline-io-label">Hard rule</span>
+        <span class="pipeline-io-value" style="color: var(--accent);">Non-fatal: failure noted and run continues to compilation.</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+        <div class="pipeline-connector"><span class="pipeline-arrow">↓</span></div>
+        <div class="pipeline-stage">
+  <div class="pipeline-stage-left">
+    <div class="pipeline-num">06</div>
+    <div class="pipeline-state">→ COMPILED</div>
+    <div class="pipeline-name">Compilation</div>
+  </div>
+  <div class="pipeline-stage-right">
+    <p>Synthesises the verified summaries into a single compiled summary. Overlapping claims are emphasised; unsupported or niche assertions are discarded. Section lineage is recorded.</p>
+    <div class="pipeline-io">
+      <div class="pipeline-io-item">
+        <span class="pipeline-io-label">Input</span>
+        <span class="pipeline-io-value">Verified summaries + ContextualAnalysis artifacts</span>
+      </div>
+      <div class="pipeline-io-item">
+        <span class="pipeline-io-label">Output</span>
+        <span class="pipeline-io-value">CompiledSummary</span>
+      </div>
+      <div class="pipeline-io-item">
+        <span class="pipeline-io-label">Model role</span>
+        <span class="pipeline-io-value">Model 5 (reused)</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+        <div class="pipeline-connector"><span class="pipeline-arrow">↓</span></div>
+        <div class="pipeline-stage">
+  <div class="pipeline-stage-left">
+    <div class="pipeline-num">07</div>
+    <div class="pipeline-state">→ FINALIZED</div>
+    <div class="pipeline-name">Finalization</div>
+  </div>
+  <div class="pipeline-stage-right">
+    <p>Assembles the full dossier: executive overview, key claims with fact IDs, compiled summary, contextual analysis, risks and limitations, and a complete audit trail. Exported as structured JSON and a typeset PDF.</p>
+    <div class="pipeline-io">
+      <div class="pipeline-io-item">
+        <span class="pipeline-io-label">Input</span>
+        <span class="pipeline-io-value">CompiledSummary + all upstream artifacts</span>
+      </div>
+      <div class="pipeline-io-item">
+        <span class="pipeline-io-label">Output</span>
+        <span class="pipeline-io-value">FinalDossier (JSON + PDF)</span>
+      </div>
+      <div class="pipeline-io-item" style="max-width: 42ch;">
+        <span class="pipeline-io-label">Hard rule</span>
+        <span class="pipeline-io-value" style="color: var(--accent);">All omissions and degraded sections must be explicitly labeled in output.</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ── Verification ──────────────────────────────────────── -->
+<section id="verification">
+  <div class="container">
+    <div class="section-label">04 — The verification core</div>
+    <h2 class="section-title">The closed-loop verification core.</h2>
+    <p class="section-intro">Stage 4 is the hallucination gate. It is the reason three summaries are generated rather than one. A summary that contradicts any extracted fact fails — regardless of how plausible it sounds.</p>
+
+    <div class="verify-diagram">
+      <div class="verify-diagram-title">Closed-Loop Verification Flow</div>
+      <div class="verify-flow">
+        <div class="verify-node">
+          <div class="verify-node-label">FactList</div>
+<div class="verify-node-sub">locked after Stage 2</div>        </div>
+<span class="verify-arrow">→</span>        <div class="verify-node">
+          <div class="verify-node-label">Summary A/B/C</div>
+<div class="verify-node-sub">3 independent models</div>        </div>
+<span class="verify-arrow">→</span>        <div class="verify-node highlight">
+          <div class="verify-node-label">Verifier</div>
+<div class="verify-node-sub">Model 5</div>        </div>
+<span class="verify-arrow">→</span>        <div class="verify-node">
+          <div class="verify-node-label">Scores each fact</div>
+<div class="verify-node-sub">aligned / absent / contradicted</div>        </div>
+<span class="verify-arrow">→</span>        <div class="verify-node">
+          <div class="verify-node-label">Pass / Retry</div>
+<div class="verify-node-sub">per summary</div>        </div>
+      </div>
+      <div class="verify-loop">
+        <span class="verify-loop-label">↺  retry loop — failed summaries only, FactList never changes</span>
+      </div>
+    </div>
+
+    <div class="verify-rules">
+      <div class="verify-rule">
+        <span class="verify-rule-status status-pass">PASS</span>
+        <p>≥ 2 summaries have contradiction_score ≤ threshold (default 0.0). Run proceeds to Stage 5.</p>
+      </div>
+      <div class="verify-rule">
+        <span class="verify-rule-status status-retry">RETRY</span>
+        <p>Fewer than 2 summaries pass. Failed summaries are regenerated and re-verified. FactList is unchanged.</p>
+      </div>
+      <div class="verify-rule">
+        <span class="verify-rule-status status-fail">HALT</span>
+        <p>Max retries reached without 2 passing. Run halts. Diagnostic artifact written. All upstream outputs preserved.</p>
+      </div>
+    </div>
+
+    <div class="callout mt-3">
+      <p><strong>Primary metric:</strong> <code>contradiction_score = contradicted_facts / total_facts</code>. Coverage (how many facts the summary mentions) is recorded as a secondary metric for the audit trail — but a tight summary that skips facts without contradicting them is acceptable. Only contradictions are disqualifying.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── Architecture ──────────────────────────────────────── -->
+<section id="architecture">
+  <div class="container">
+    <div class="section-label">05 — Architecture</div>
+    <h2 class="section-title">Architecture and artifact contracts.</h2>
+    <p class="section-intro">Every stage passes typed JSON artifacts. No free-form text between stages. Artifacts are written to disk immediately upon creation and are never mutated after that.</p>
+
+    <h3 class="mono mb-2" style="color: var(--text-2); font-size: 0.75rem; letter-spacing: 0.12em; text-transform: uppercase;">Model Assignment Map</h3>
+    <div class="arch-table-wrap mb-4">
+      <table>
+        <thead>
+          <tr>
+            <th>Role</th>
+            <th>Slot</th>
+            <th>Default model</th>
+            <th>Purpose</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Summarizer A</td>
+            <td><span class="tag">Model 1</span></td>
+            <td><span class="model-pill">claude-haiku-4-5-20251001</span></td>
+            <td>Fast, cheap summarization</td>
+          </tr>
+          <tr>
+            <td>Summarizer B</td>
+            <td><span class="tag">Model 2</span></td>
+            <td><span class="model-pill">Qwen/Qwen2.5-72B-Instruct</span></td>
+            <td>Different vendor / architecture</td>
+          </tr>
+          <tr>
+            <td>Summarizer C</td>
+            <td><span class="tag">Model 3</span></td>
+            <td><span class="model-pill">meta-llama/Llama-3.3-70B-Instruct-Turbo</span></td>
+            <td>Third independent summary</td>
+          </tr>
+          <tr>
+            <td>Fact Finder</td>
+            <td><span class="tag">Model 4</span></td>
+            <td><span class="model-pill">claude-haiku-4-5-20251001</span></td>
+            <td>Extractive only, no synthesis</td>
+          </tr>
+          <tr>
+            <td>Compiler/Verifier</td>
+            <td><span class="tag">Model 5</span></td>
+            <td><span class="model-pill">deepseek-ai/DeepSeek-V3</span></td>
+            <td>Higher quality, verification &amp; compilation</td>
+          </tr>
+          <tr>
+            <td>Contextualizer A</td>
+            <td><span class="tag">Model 6</span></td>
+            <td><span class="model-pill">Qwen/Qwen2.5-72B-Instruct</span></td>
+            <td>External context, cited</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3 class="mono mb-2" style="color: var(--text-2); font-size: 0.75rem; letter-spacing: 0.12em; text-transform: uppercase;">Artifact Contracts</h3>
+    <div class="artifacts-flow mb-4">
+      <div class="artifact-card">
+        <div class="artifact-name">IngestionRecord</div>
+        <div class="artifact-meta">
+          <div>Produced by <span>Stage 1</span></div>
+          <div>Consumed by <span>Stages 2, 3</span></div>
+        </div>
+      </div>
+      <div class="artifact-card">
+        <div class="artifact-name">FactList</div>
+        <div class="artifact-meta">
+          <div>Produced by <span>Stage 2</span></div>
+          <div>Consumed by <span>Stages 4, 6, 7</span></div>
+        </div>
+      </div>
+      <div class="artifact-card">
+        <div class="artifact-name">Summary_[A/B/C]</div>
+        <div class="artifact-meta">
+          <div>Produced by <span>Stage 3</span></div>
+          <div>Consumed by <span>Stage 4</span></div>
+        </div>
+      </div>
+      <div class="artifact-card">
+        <div class="artifact-name">VerificationReport</div>
+        <div class="artifact-meta">
+          <div>Produced by <span>Stage 4</span></div>
+          <div>Consumed by <span>Stages 5, 6</span></div>
+        </div>
+      </div>
+      <div class="artifact-card">
+        <div class="artifact-name">ContextualAnalysis_[A/B]</div>
+        <div class="artifact-meta">
+          <div>Produced by <span>Stage 5</span></div>
+          <div>Consumed by <span>Stage 6</span></div>
+        </div>
+      </div>
+      <div class="artifact-card">
+        <div class="artifact-name">CompiledSummary</div>
+        <div class="artifact-meta">
+          <div>Produced by <span>Stage 6</span></div>
+          <div>Consumed by <span>Stage 7</span></div>
+        </div>
+      </div>
+      <div class="artifact-card">
+        <div class="artifact-name">FinalDossier</div>
+        <div class="artifact-meta">
+          <div>Produced by <span>Stage 7</span></div>
+          <div>Consumed by <span>Export</span></div>
+        </div>
+      </div>
+      <div class="artifact-card">
+        <div class="artifact-name">AuditTrail</div>
+        <div class="artifact-meta">
+          <div>Produced by <span>All stages</span></div>
+          <div>Consumed by <span>Stage 7 + export</span></div>
+        </div>
+      </div>
+    </div>
+
+    <h3 class="mono mb-2" style="color: var(--text-2); font-size: 0.75rem; letter-spacing: 0.12em; text-transform: uppercase;">Run Folder Layout</h3>
+    <div class="folder-tree">
+      <div><span class="dir">runs/</span></div>
+      <div>&nbsp;&nbsp;<span class="dir">└── dossier_run_YYYYMMDD_HHMMSS_&lt;hash&gt;/</span></div>
+      <div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="file">├── 00_input/</span>&nbsp;&nbsp;<span class="comment">← original PDF, unchanged</span></div>
+      <div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="file">├── 01_ingestion/</span>&nbsp;&nbsp;<span class="comment">← IngestionRecord.json</span></div>
+      <div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="highlight-file">├── 02_extraction/</span>&nbsp;&nbsp;<span class="comment">← FactList.json</span></div>
+      <div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="file">├── 03_summarization/</span>&nbsp;&nbsp;<span class="comment">← Summary_A.json, _B.json, _C.json</span></div>
+      <div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="highlight-file">├── 04_verification/</span>&nbsp;&nbsp;<span class="comment">← VerificationReport.json</span></div>
+      <div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="file">├── 05_contextual/</span>&nbsp;&nbsp;<span class="comment">← ContextualAnalysis_A.json, _B.json</span></div>
+      <div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="file">├── 06_compilation/</span>&nbsp;&nbsp;<span class="comment">← CompiledSummary.json</span></div>
+      <div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="highlight-file">├── 07_final/</span>&nbsp;&nbsp;<span class="comment">← FinalDossier.json + .pdf</span></div>
+      <div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="file">└── audit/</span>&nbsp;&nbsp;<span class="comment">← AuditTrail.json, run_manifest.json</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Tech Stack ────────────────────────────────────────── -->
+<section id="stack">
+  <div class="container">
+    <div class="section-label">06 — Tech stack</div>
+    <h2 class="section-title">Built with.</h2>
+    <p class="section-intro">Practical choices made for correctness and clarity — not to chase novelty. Every dependency earns its place.</p>
+
+    <div class="tech-grid">
+      <div class="tech-card">
+        <div class="tech-category">Language</div>
+        <div class="tech-name">Python 3.x</div>
+        <div class="tech-desc">Clear, portable, strong ecosystem for document and ML work.</div>
+      </div>
+      <div class="tech-card">
+        <div class="tech-category">PDF parsing</div>
+        <div class="tech-name">pdfplumber</div>
+        <div class="tech-desc">Machine-readable PDFs only. Image-only PDFs are explicitly rejected.</div>
+      </div>
+      <div class="tech-card">
+        <div class="tech-category">Data layer</div>
+        <div class="tech-name">Pydantic</div>
+        <div class="tech-desc">All artifacts are typed Pydantic models. No raw dicts between stages.</div>
+      </div>
+      <div class="tech-card">
+        <div class="tech-category">LLM — primary</div>
+        <div class="tech-name">Anthropic API</div>
+        <div class="tech-desc">Claude Haiku for extraction and summarization. Claude Sonnet for verification.</div>
+      </div>
+      <div class="tech-card">
+        <div class="tech-category">LLM — open</div>
+        <div class="tech-name">Together AI</div>
+        <div class="tech-desc">Llama, Qwen, DeepSeek — architecture diversity for multi-model verification.</div>
+      </div>
+      <div class="tech-card">
+        <div class="tech-category">Config</div>
+        <div class="tech-name">JSON config</div>
+        <div class="tech-desc">All model assignments, thresholds, and retry limits in configs/v1.json.</div>
+      </div>
+      <div class="tech-card">
+        <div class="tech-category">Output</div>
+        <div class="tech-name">ReportLab PDF</div>
+        <div class="tech-desc">Editorial monochrome dossier layout. Typeset, not templated.</div>
+      </div>
+      <div class="tech-card">
+        <div class="tech-category">UI</div>
+        <div class="tech-name">Streamlit</div>
+        <div class="tech-desc">Lightweight web UI for local runs. Pipeline progress, artifact inspection.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+  </main>
+
+<footer>
+  <div class="container">
+    <div class="footer-inner">
+      <div class="footer-logo">
+        <strong>Chorus AI / Dossier V1</strong><br>
+        A closed-loop, multi-model document intelligence system.
+      </div>
+      <ul class="footer-links">
+        <li><a href="https://github.com/danielwipert/chorusai" target="_blank" rel="noopener">GitHub</a></li>
+        <li><a href="#overview">Back to top</a></li>
+      </ul>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>

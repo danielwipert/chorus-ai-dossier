@@ -1,0 +1,264 @@
+{% extends "base.html" %}
+
+{% macro stage_row(stage) %}
+<div class="pipeline-stage">
+  <div class="pipeline-stage-left">
+    <div class="pipeline-num">{{ "%02d"|format(stage.num) }}</div>
+    <div class="pipeline-state">{{ stage.state }}</div>
+    <div class="pipeline-name">{{ stage.name }}</div>
+  </div>
+  <div class="pipeline-stage-right">
+    <p>{{ stage.desc }}</p>
+    <div class="pipeline-io">
+      <div class="pipeline-io-item">
+        <span class="pipeline-io-label">Input</span>
+        <span class="pipeline-io-value">{{ stage.input }}</span>
+      </div>
+      <div class="pipeline-io-item">
+        <span class="pipeline-io-label">Output</span>
+        <span class="pipeline-io-value">{{ stage.output }}</span>
+      </div>
+      {% if stage.model %}
+      <div class="pipeline-io-item">
+        <span class="pipeline-io-label">Model role</span>
+        <span class="pipeline-io-value">{{ stage.model }}</span>
+      </div>
+      {% endif %}
+      {% if stage.hard_rule %}
+      <div class="pipeline-io-item" style="max-width: 42ch;">
+        <span class="pipeline-io-label">Hard rule</span>
+        <span class="pipeline-io-value" style="color: var(--accent);">{{ stage.hard_rule }}</span>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endmacro %}
+
+{% block nav %}
+<nav>
+  <div class="nav-inner">
+    <span class="nav-logo"><span>//</span> CHORUS<span>.</span>AI</span>
+    <ul class="nav-links">
+      {% for link in nav_links %}
+      <li><a href="#{{ link.anchor }}">{{ link.label }}</a></li>
+      {% endfor %}
+    </ul>
+  </div>
+</nav>
+{% endblock %}
+
+{% block content %}
+
+<!-- ── Hero ─────────────────────────────────────────────── -->
+<section class="hero" id="overview">
+  <div class="container">
+    <div class="hero-tag">{{ hero.tag }}</div>
+    <h1>{{ hero.title | safe }}</h1>
+    <p class="hero-sub">{{ hero.subtitle }}</p>
+    <div class="hero-cta">
+      <a href="#pipeline" class="btn btn-primary">Explore the Pipeline</a>
+      <a href="{{ github_url }}" class="btn btn-secondary" target="_blank" rel="noopener">View on GitHub</a>
+    </div>
+
+    <div class="hero-stats">
+      {% for stat in stats %}
+      <div class="hero-stat">
+        <div class="hero-stat-value">{{ stat.value }}</div>
+        <div class="hero-stat-label">{{ stat.label }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- ── What It Is ────────────────────────────────────────── -->
+<section id="what">
+  <div class="container">
+    <div class="section-label">01 — What it is</div>
+    <h2 class="section-title">{{ what.title }}</h2>
+    <p class="section-intro">{{ what.intro }}</p>
+
+    <div class="what-grid">
+      {% for cell in what.cells %}
+      <div class="what-cell">
+        <div class="what-cell-label">{{ cell.label }}</div>
+        <h3>{{ cell.heading }}</h3>
+        <p>{{ cell.body }}</p>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="callout">
+      <p>{{ what.callout | safe }}</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── Design Principles ─────────────────────────────────── -->
+<section id="principles">
+  <div class="container">
+    <div class="section-label">02 — Design theory</div>
+    <h2 class="section-title">{{ principles.title }}</h2>
+    <p class="section-intro">{{ principles.intro }}</p>
+
+    <div class="principles-grid">
+      {% for p in principles.cards %}
+      <div class="principle-card">
+        <div class="principle-accent"></div>
+        <div class="principle-num">Rule {{ "%02d"|format(loop.index) }}</div>
+        <div class="principle-name">{{ p.name }}</div>
+        <p class="principle-desc">{{ p.desc }}</p>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- ── Pipeline ──────────────────────────────────────────── -->
+<section id="pipeline">
+  <div class="container">
+    <div class="section-label">03 — The pipeline</div>
+    <h2 class="section-title">{{ pipeline.title }}</h2>
+    <p class="section-intro">{{ pipeline.intro }}</p>
+
+    <div class="pipeline-flow">
+      {% for stage in pipeline.stages %}
+        {{ stage_row(stage) }}
+        {% if not loop.last %}
+        <div class="pipeline-connector"><span class="pipeline-arrow">↓</span></div>
+        {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- ── Verification ──────────────────────────────────────── -->
+<section id="verification">
+  <div class="container">
+    <div class="section-label">04 — The verification core</div>
+    <h2 class="section-title">{{ verification.title }}</h2>
+    <p class="section-intro">{{ verification.intro }}</p>
+
+    <div class="verify-diagram">
+      <div class="verify-diagram-title">Closed-Loop Verification Flow</div>
+      <div class="verify-flow">
+        {% for node in verification.flow_nodes %}
+        <div class="verify-node{% if node.highlight %} highlight{% endif %}">
+          <div class="verify-node-label">{{ node.label }}</div>
+          {% if node.sub %}<div class="verify-node-sub">{{ node.sub }}</div>{% endif %}
+        </div>
+        {% if not loop.last %}<span class="verify-arrow">→</span>{% endif %}
+        {% endfor %}
+      </div>
+      <div class="verify-loop">
+        <span class="verify-loop-label">↺  retry loop — failed summaries only, FactList never changes</span>
+      </div>
+    </div>
+
+    <div class="verify-rules">
+      {% for rule in verification.rules %}
+      <div class="verify-rule">
+        <span class="verify-rule-status status-{{ rule.status_class }}">{{ rule.status_label }}</span>
+        <p>{{ rule.desc }}</p>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="callout mt-3">
+      <p>{{ verification.callout | safe }}</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── Architecture ──────────────────────────────────────── -->
+<section id="architecture">
+  <div class="container">
+    <div class="section-label">05 — Architecture</div>
+    <h2 class="section-title">{{ architecture.title }}</h2>
+    <p class="section-intro">{{ architecture.intro }}</p>
+
+    <h3 class="mono mb-2" style="color: var(--text-2); font-size: 0.75rem; letter-spacing: 0.12em; text-transform: uppercase;">Model Assignment Map</h3>
+    <div class="arch-table-wrap mb-4">
+      <table>
+        <thead>
+          <tr>
+            {% for col in architecture.model_table.columns %}
+            <th>{{ col }}</th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in architecture.model_table.rows %}
+          <tr>
+            <td>{{ row.role }}</td>
+            <td><span class="tag">{{ row.slot }}</span></td>
+            <td><span class="model-pill">{{ row.model }}</span></td>
+            <td>{{ row.purpose }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <h3 class="mono mb-2" style="color: var(--text-2); font-size: 0.75rem; letter-spacing: 0.12em; text-transform: uppercase;">Artifact Contracts</h3>
+    <div class="artifacts-flow mb-4">
+      {% for artifact in architecture.artifacts %}
+      <div class="artifact-card">
+        <div class="artifact-name">{{ artifact.name }}</div>
+        <div class="artifact-meta">
+          <div>Produced by <span>{{ artifact.producer }}</span></div>
+          <div>Consumed by <span>{{ artifact.consumer }}</span></div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <h3 class="mono mb-2" style="color: var(--text-2); font-size: 0.75rem; letter-spacing: 0.12em; text-transform: uppercase;">Run Folder Layout</h3>
+    <div class="folder-tree">
+      <div><span class="dir">runs/</span></div>
+      <div>&nbsp;&nbsp;<span class="dir">└── dossier_run_YYYYMMDD_HHMMSS_&lt;hash&gt;/</span></div>
+      {% for entry in architecture.folder_entries %}
+      <div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="{% if entry.highlight %}highlight-file{% else %}file{% endif %}">{{ entry.path }}</span>&nbsp;&nbsp;<span class="comment">{{ entry.comment }}</span></div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- ── Tech Stack ────────────────────────────────────────── -->
+<section id="stack">
+  <div class="container">
+    <div class="section-label">06 — Tech stack</div>
+    <h2 class="section-title">{{ stack.title }}</h2>
+    <p class="section-intro">{{ stack.intro }}</p>
+
+    <div class="tech-grid">
+      {% for item in stack.cards %}
+      <div class="tech-card">
+        <div class="tech-category">{{ item.category }}</div>
+        <div class="tech-name">{{ item.name }}</div>
+        <div class="tech-desc">{{ item.desc }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+{% endblock %}
+
+{% block footer %}
+<footer>
+  <div class="container">
+    <div class="footer-inner">
+      <div class="footer-logo">
+        <strong>Chorus AI / Dossier V1</strong><br>
+        A closed-loop, multi-model document intelligence system.
+      </div>
+      <ul class="footer-links">
+        <li><a href="{{ github_url }}" target="_blank" rel="noopener">GitHub</a></li>
+        <li><a href="#overview">Back to top</a></li>
+      </ul>
+    </div>
+  </div>
+</footer>
+{% endblock %}
